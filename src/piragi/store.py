@@ -1,14 +1,11 @@
 """Vector store using LanceDB."""
 
-import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import lancedb
-import pyarrow as pa
 
 from .types import Chunk, Citation
-
 
 # Common embedding model dimensions
 EMBEDDING_DIMENSIONS = {
@@ -55,7 +52,7 @@ class VectorStore:
         self,
         persist_dir: str = ".piragi",
         embedding_model: str = "all-mpnet-base-v2",
-        vector_dimension: Optional[int] = None,
+        vector_dimension: int | None = None,
     ) -> None:
         """
         Initialize the vector store.
@@ -79,11 +76,11 @@ class VectorStore:
         self.db = lancedb.connect(persist_dir)
         self.table_name = "chunks"
         self.metadata_table_name = "source_metadata"
-        self.table: Optional[Any] = None
-        self.metadata_table: Optional[Any] = None
+        self.table: Any | None = None
+        self.metadata_table: Any | None = None
 
         # Track all chunk texts for hybrid search
-        self._chunk_texts: List[str] = []
+        self._chunk_texts: list[str] = []
 
         # Initialize tables if they exist
         if self.table_name in self.db.table_names():
@@ -98,7 +95,7 @@ class VectorStore:
         if self.metadata_table_name in self.db.table_names():
             self.metadata_table = self.db.open_table(self.metadata_table_name)
 
-    def add_chunks(self, chunks: List[Chunk]) -> None:
+    def add_chunks(self, chunks: list[Chunk]) -> None:
         """
         Add chunks to the vector store.
 
@@ -134,7 +131,7 @@ class VectorStore:
         else:
             self.table.add(data)
 
-    def get_all_chunk_texts(self) -> List[str]:
+    def get_all_chunk_texts(self) -> list[str]:
         """
         Get all chunk texts for hybrid search indexing.
 
@@ -145,11 +142,11 @@ class VectorStore:
 
     def search(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int = 5,
-        filters: Optional[Dict[str, Any]] = None,
+        filters: dict[str, Any] | None = None,
         min_chunk_length: int = 100,
-    ) -> List[Citation]:
+    ) -> list[Citation]:
         """
         Search for similar chunks.
 
@@ -211,7 +208,7 @@ class VectorStore:
         """Return the number of chunks in the store."""
         if self.table is None:
             return 0
-        return self.table.count_rows()
+        return int(self.table.count_rows())
 
     def delete_by_source(self, source: str) -> int:
         """
@@ -227,13 +224,13 @@ class VectorStore:
             return 0
 
         # Count chunks before deletion
-        count_before = self.table.count_rows()
+        count_before = int(self.table.count_rows())
 
         # Delete chunks matching the source
         self.table.delete(f"source = '{source}'")
 
         # Count chunks after deletion
-        count_after = self.table.count_rows()
+        count_after = int(self.table.count_rows())
 
         return count_before - count_after
 

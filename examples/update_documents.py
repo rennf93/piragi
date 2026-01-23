@@ -2,6 +2,7 @@
 
 import os
 import tempfile
+
 from piragi import Ragi
 
 
@@ -47,7 +48,7 @@ def main():
         # Ask a question
         print("\n3. Querying initial version...")
         answer = kb.ask("What features are available?")
-        print(f"   Q: What features are available?")
+        print("   Q: What features are available?")
         print(f"   A: {answer.text[:150]}...")
 
         # Update the document
@@ -89,11 +90,11 @@ def main():
         # Query updated content
         print("\n7. Querying updated version...")
         answer = kb.ask("What features are available?")
-        print(f"   Q: What features are available?")
+        print("   Q: What features are available?")
         print(f"   A: {answer.text[:200]}...")
 
         answer = kb.ask("What are the pricing tiers?")
-        print(f"\n   Q: What are the pricing tiers?")
+        print("\n   Q: What are the pricing tiers?")
         print(f"   A: {answer.text[:200]}...")
 
         # Demonstrate refresh with multiple files
@@ -117,9 +118,7 @@ def main():
 
         # Update both
         with open(api_doc, "w") as f:
-            f.write(
-                "# API Documentation\n\nREST API v2 with GraphQL support (updated!)."
-            )
+            f.write("# API Documentation\n\nREST API v2 with GraphQL support (updated!).")
 
         with open(guide_doc, "w") as f:
             f.write("# User Guide\n\nQuick start guide (updated!).")

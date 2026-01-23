@@ -2,24 +2,25 @@
 
 import json
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 # Lazy import networkx
 _nx = None
 
 
-def _get_networkx():
+def _get_networkx() -> Any:
     """Lazy load networkx, raising helpful error if not installed."""
     global _nx
     if _nx is None:
         try:
             import networkx as nx
+
             _nx = nx
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "networkx is required for knowledge graph support. "
                 "Install it with: pip install piragi[graph] or pip install networkx"
-            )
+            ) from e
     return _nx
 
 
@@ -31,7 +32,7 @@ class KnowledgeGraph:
     stores them in a NetworkX graph for traversal and hybrid retrieval.
     """
 
-    def __init__(self, persist_path: Optional[str] = None) -> None:
+    def __init__(self, persist_path: str | None = None) -> None:
         """
         Initialize knowledge graph.
 
@@ -41,13 +42,13 @@ class KnowledgeGraph:
         nx = _get_networkx()
         self._graph = nx.DiGraph()
         self._persist_path = persist_path
-        self._triples: List[Tuple[str, str, str]] = []
+        self._triples: list[tuple[str, str, str]] = []
 
         # Load existing graph if available
         if persist_path and os.path.exists(persist_path):
             self._load()
 
-    def extract_and_add(self, text: str, llm_client: Any, model: str) -> List[Tuple[str, str, str]]:
+    def extract_and_add(self, text: str, llm_client: Any, model: str) -> list[tuple[str, str, str]]:
         """
         Extract entities and relationships from text using LLM.
 
@@ -112,7 +113,7 @@ Return ONLY the JSON array, no other text."""
         self._graph.add_edge(subject, obj, relation=predicate)
         self._triples.append((subject, predicate, obj))
 
-    def neighbors(self, entity: str) -> List[str]:
+    def neighbors(self, entity: str) -> list[str]:
         """Get all entities connected to the given entity."""
         entity = entity.strip().lower()
         if entity not in self._graph:
@@ -123,7 +124,7 @@ Return ONLY the JSON array, no other text."""
         succs = list(self._graph.successors(entity))
         return list(set(preds + succs))
 
-    def get_relations(self, entity: str) -> List[Tuple[str, str, str]]:
+    def get_relations(self, entity: str) -> list[tuple[str, str, str]]:
         """Get all triples involving the given entity."""
         entity = entity.strip().lower()
         results = []
@@ -134,15 +135,15 @@ Return ONLY the JSON array, no other text."""
 
         return results
 
-    def triples(self) -> List[Tuple[str, str, str]]:
+    def triples(self) -> list[tuple[str, str, str]]:
         """Get all triples in the graph."""
         return self._triples.copy()
 
-    def entities(self) -> List[str]:
+    def entities(self) -> list[str]:
         """Get all entities in the graph."""
         return list(self._graph.nodes())
 
-    def search(self, query: str) -> List[Tuple[str, str, str]]:
+    def search(self, query: str) -> list[tuple[str, str, str]]:
         """
         Search for triples matching the query string.
 
@@ -180,7 +181,7 @@ Return ONLY the JSON array, no other text."""
 
         return "\n".join(lines)
 
-    def count(self) -> Dict[str, int]:
+    def count(self) -> dict[str, int]:
         """Return counts of entities and relationships."""
         return {
             "entities": len(self._graph.nodes()),
@@ -215,7 +216,7 @@ Return ONLY the JSON array, no other text."""
             return
 
         try:
-            with open(self._persist_path, "r") as f:
+            with open(self._persist_path) as f:
                 data = json.load(f)
 
             for s, p, o in data.get("triples", []):

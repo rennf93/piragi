@@ -3,11 +3,12 @@
 import os
 import tempfile
 import time
+
 from piragi import Ragi
-from ragi.change_detection import ChangeDetector
+from piragi.change_detection import ChangeDetector
 
 
-def example_file_change_detection():
+def example_file_change_detection() -> None:
     """Demonstrate file change detection with minimal latency."""
     print("=" * 60)
     print("File Change Detection (Lazy Strategy)")
@@ -29,11 +30,11 @@ def example_file_change_detection():
         )
 
         # Store metadata for change detection
-        with open(doc_path, "r") as f:
+        with open(doc_path) as f:
             content = f.read()
 
         metadata = ChangeDetector.get_file_metadata(doc_path, content)
-        print(f"   Stored metadata:")
+        print("   Stored metadata:")
         print(f"   - mtime: {metadata['mtime']}")
         print(f"   - hash: {metadata['content_hash'][:16]}...")
 
@@ -67,12 +68,12 @@ def example_file_change_detection():
         print(f"   ⚡ Check took: {elapsed:.2f}ms")
 
         if changed:
-            print(f"   → Refreshing document...")
+            print("   → Refreshing document...")
             kb.refresh(doc_path)
-            print(f"   ✓ Updated to latest version")
+            print("   ✓ Updated to latest version")
 
 
-def example_url_change_detection():
+def example_url_change_detection() -> None:
     """Demonstrate URL change detection with HTTP conditional requests."""
     print("\n" + "=" * 60)
     print("URL Change Detection (HTTP Headers)")
@@ -104,12 +105,10 @@ def example_url_change_detection():
 
         print(f"   ⚡ Check took: {elapsed:.0f}ms")
         print(f"   Changed: {result2.get('changed')}")
-        print(
-            f"   Status: {'304 Not Modified' if not result2.get('changed') else '200 OK'}"
-        )
+        print(f"   Status: {'304 Not Modified' if not result2.get('changed') else '200 OK'}")
 
 
-def example_smart_update_workflow():
+def example_smart_update_workflow() -> None:
     """Demonstrate smart update workflow with check intervals."""
     print("\n" + "=" * 60)
     print("Smart Update Workflow (Check Intervals)")
@@ -130,7 +129,7 @@ def example_smart_update_workflow():
         )
 
         # Store metadata
-        with open(doc_path, "r") as f:
+        with open(doc_path) as f:
             content = f.read()
         metadata = ChangeDetector.get_file_metadata(doc_path, content)
 
@@ -142,23 +141,19 @@ def example_smart_update_workflow():
 
         # Immediate query - no check needed yet
         print("\n2. Query immediately (within check interval)...")
-        should_check = ChangeDetector.should_check_now(
-            metadata["last_checked"], check_interval
-        )
+        should_check = ChangeDetector.should_check_now(metadata["last_checked"], check_interval)
         print(f"   Should check for updates: {should_check}")
-        print(f"   → Skipping check, using cached version")
+        print("   → Skipping check, using cached version")
 
         # Wait and query again
         print(f"\n3. Waiting {check_interval}s...")
         time.sleep(check_interval + 0.1)
 
-        should_check = ChangeDetector.should_check_now(
-            metadata["last_checked"], check_interval
-        )
+        should_check = ChangeDetector.should_check_now(metadata["last_checked"], check_interval)
         print(f"   Should check for updates: {should_check}")
 
         if should_check:
-            print(f"   → Checking for changes...")
+            print("   → Checking for changes...")
             changed = ChangeDetector.check_file_changed(
                 doc_path, metadata["mtime"], metadata["content_hash"]
             )
@@ -167,12 +162,12 @@ def example_smart_update_workflow():
             if changed:
                 kb.refresh(doc_path)
                 # Update metadata
-                with open(doc_path, "r") as f:
+                with open(doc_path) as f:
                     content = f.read()
                 metadata = ChangeDetector.get_file_metadata(doc_path, content)
 
         print(
-            f"""
+            """
 Latency Analysis:
 ─────────────────────────────────────────────────────────
 Query Pattern              | Latency Impact
@@ -191,7 +186,7 @@ Recommended Intervals:
         )
 
 
-def main():
+def main() -> None:
     """Run all change detection examples."""
     example_file_change_detection()
 
@@ -231,7 +226,7 @@ def main():
 Usage Pattern:
 ```python
 from piragi import Ragi
-from ragi.change_detection import ChangeDetector
+from piragi.change_detection import ChangeDetector
 
 # Track sources with metadata
 sources_metadata = {}

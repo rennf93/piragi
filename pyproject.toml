@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [
-    { name = "Hemanth HM", email = "hemanth.hm@gmail.com" }
+    { name = "Hemanth HM", email = "hemanth.hm@users.noreply.github.com" }
 ]
 keywords = ["rag", "retrieval", "embeddings", "vector-search", "llm", "ai"]
 classifiers = [
@@ -61,13 +61,13 @@ all = [
 ]
 dev = [
     # Testing
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-cov>=4.0.0",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
     # Code Quality
-    "ruff>=0.1.0",
-    "mypy>=1.0.0",
-    "pre-commit>=3.0.0",
+    "ruff",
+    "mypy",
+    "pre-commit",
 ]
 
 [project.urls]
@@ -129,8 +129,27 @@ module = [
     "supabase.*",
     "pysbd.*",
     "markitdown.*",
+    "requests.*",
+    "networkx.*",
+    "fsspec.*",
+    "sklearn.*",
+    "psycopg2.*",
+    "pgvector.*",
+    "streamlit.*",
+    "psutil.*",
 ]
 ignore_missing_imports = true
+
+# Relaxed rules for tests and examples
+[[tool.mypy.overrides]]
+module = [
+    "tests.*",
+    "examples.*",
+    "ui.*",
+]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = false
 
 # =============================================================================
 # PYTEST Configuration

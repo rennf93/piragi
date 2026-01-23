@@ -1,15 +1,16 @@
 """Tests for reranking functionality."""
 
-import pytest
 from unittest.mock import MagicMock, patch
-import numpy as np
 
-from piragi.reranker import CrossEncoderReranker, TFIDFReranker, HybridReranker
+import numpy as np
+import pytest
+
+from piragi.reranker import CrossEncoderReranker, HybridReranker, TFIDFReranker
 from piragi.types import Citation
 
 
 @pytest.fixture
-def sample_citations():
+def sample_citations() -> list[Citation]:
     """Create sample citations for testing."""
     return [
         Citation(
@@ -42,19 +43,19 @@ def sample_citations():
 class TestTFIDFReranker:
     """Tests for TF-IDF based reranking."""
 
-    def test_init_default_weights(self):
+    def test_init_default_weights(self) -> None:
         """Test initialization with default weights."""
         reranker = TFIDFReranker()
         assert reranker.vector_weight == 0.6
         assert reranker.tfidf_weight == 0.4
 
-    def test_init_custom_weights(self):
+    def test_init_custom_weights(self) -> None:
         """Test initialization with custom weights."""
         reranker = TFIDFReranker(vector_weight=0.7, tfidf_weight=0.3)
         assert reranker.vector_weight == 0.7
         assert reranker.tfidf_weight == 0.3
 
-    def test_init_invalid_weights(self):
+    def test_init_invalid_weights(self) -> None:
         """Test that invalid weights raise ValueError."""
         with pytest.raises(ValueError):
             TFIDFReranker(vector_weight=1.5, tfidf_weight=0.3)
@@ -62,20 +63,20 @@ class TestTFIDFReranker:
         with pytest.raises(ValueError):
             TFIDFReranker(vector_weight=0.5, tfidf_weight=-0.1)
 
-    def test_rerank_empty_citations(self):
+    def test_rerank_empty_citations(self) -> None:
         """Test reranking with empty citations list."""
         reranker = TFIDFReranker()
         result = reranker.rerank("test query", [])
         assert result == []
 
-    def test_rerank_single_citation(self, sample_citations):
+    def test_rerank_single_citation(self, sample_citations: list[Citation]) -> None:
         """Test reranking with single citation returns as-is."""
         reranker = TFIDFReranker()
         result = reranker.rerank("test query", [sample_citations[0]])
         assert len(result) == 1
         assert result[0].source == sample_citations[0].source
 
-    def test_rerank_keyword_boost(self, sample_citations):
+    def test_rerank_keyword_boost(self, sample_citations: list[Citation]) -> None:
         """Test that citations with query keywords get boosted."""
         reranker = TFIDFReranker(vector_weight=0.5, tfidf_weight=0.5)
         query = "Python programming language"
@@ -87,18 +88,18 @@ class TestTFIDFReranker:
         python_sources = [c.source for c in result[:2]]
         assert any("doc1" in s or "doc3" in s or "doc4" in s for s in python_sources)
 
-    def test_rerank_top_k(self, sample_citations):
+    def test_rerank_top_k(self, sample_citations: list[Citation]) -> None:
         """Test reranking with top_k limit."""
         reranker = TFIDFReranker()
         result = reranker.rerank("Python", sample_citations, top_k=2)
         assert len(result) == 2
 
-    def test_rerank_preserves_metadata(self, sample_citations):
+    def test_rerank_preserves_metadata(self, sample_citations: list[Citation]) -> None:
         """Test that reranking preserves citation metadata."""
         reranker = TFIDFReranker()
         result = reranker.rerank("test", sample_citations)
 
-        for original, reranked in zip(sample_citations, result):
+        for original, _reranked in zip(sample_citations, result, strict=False):
             # Check that at least one has matching metadata
             found = any(r.metadata == original.metadata for r in result)
             assert found or len(result) == len(sample_citations)
@@ -107,20 +108,18 @@ class TestTFIDFReranker:
 class TestCrossEncoderReranker:
     """Tests for cross-encoder reranking."""
 
-    def test_init_default_model(self):
+    def test_init_default_model(self) -> None:
         """Test initialization with default model."""
         reranker = CrossEncoderReranker()
         assert reranker.model_name == "cross-encoder/ms-marco-MiniLM-L-6-v2"
         assert reranker._model is None  # Lazy loaded
 
-    def test_init_custom_model(self):
+    def test_init_custom_model(self) -> None:
         """Test initialization with custom model."""
-        reranker = CrossEncoderReranker(
-            model_name="cross-encoder/ms-marco-MiniLM-L-12-v2"
-        )
+        reranker = CrossEncoderReranker(model_name="cross-encoder/ms-marco-MiniLM-L-12-v2")
         assert "L-12" in reranker.model_name
 
-    def test_init_trust_remote_code(self):
+    def test_init_trust_remote_code(self) -> None:
         """Test initialization with trust_remote_code for custom models (issue #15)."""
         # Default should be False
         reranker = CrossEncoderReranker()
@@ -132,25 +131,26 @@ class TestCrossEncoderReranker:
 
         # For models like Alibaba-NLP/gte-multilingual-reranker-base
         reranker_alibaba = CrossEncoderReranker(
-            model_name="Alibaba-NLP/gte-multilingual-reranker-base",
-            trust_remote_code=True
+            model_name="Alibaba-NLP/gte-multilingual-reranker-base", trust_remote_code=True
         )
         assert reranker_alibaba._trust_remote_code is True
 
-    def test_rerank_empty_citations(self):
+    def test_rerank_empty_citations(self) -> None:
         """Test reranking with empty citations."""
         reranker = CrossEncoderReranker()
         result = reranker.rerank("test", [])
         assert result == []
 
-    def test_rerank_single_citation(self, sample_citations):
+    def test_rerank_single_citation(self, sample_citations: list[Citation]) -> None:
         """Test reranking single citation returns as-is."""
         reranker = CrossEncoderReranker()
         result = reranker.rerank("test", [sample_citations[0]])
         assert len(result) == 1
 
     @patch("sentence_transformers.CrossEncoder")
-    def test_rerank_uses_cross_encoder(self, mock_ce_class, sample_citations):
+    def test_rerank_uses_cross_encoder(
+        self, mock_ce_class: MagicMock, sample_citations: list[Citation]
+    ) -> None:
         """Test that reranking uses CrossEncoder model."""
         # Mock the cross-encoder
         mock_model = MagicMock()
@@ -169,7 +169,7 @@ class TestCrossEncoderReranker:
         assert scores == sorted(scores, reverse=True)
 
     @patch("sentence_transformers.CrossEncoder")
-    def test_rerank_top_k(self, mock_ce_class, sample_citations):
+    def test_rerank_top_k(self, mock_ce_class: MagicMock, sample_citations: list[Citation]) -> None:
         """Test cross-encoder reranking with top_k."""
         mock_model = MagicMock()
         mock_model.predict.return_value = np.array([0.9, 0.3, 0.7, 0.5])
@@ -181,7 +181,7 @@ class TestCrossEncoderReranker:
         assert len(result) == 2
 
     @patch("sentence_transformers.CrossEncoder")
-    def test_score_pair(self, mock_ce_class):
+    def test_score_pair(self, mock_ce_class: MagicMock) -> None:
         """Test scoring a single query-passage pair."""
         mock_model = MagicMock()
         mock_model.predict.return_value = np.array([1.5])  # Raw score
@@ -196,24 +196,24 @@ class TestCrossEncoderReranker:
 class TestHybridReranker:
     """Tests for hybrid reranking (TF-IDF + cross-encoder)."""
 
-    def test_init_defaults(self):
+    def test_init_defaults(self) -> None:
         """Test initialization with defaults."""
         reranker = HybridReranker(use_cross_encoder=False)
         assert reranker.tfidf_reranker is not None
         assert reranker._cross_encoder is None
 
-    def test_init_with_cross_encoder(self):
+    def test_init_with_cross_encoder(self) -> None:
         """Test initialization with cross-encoder enabled."""
         reranker = HybridReranker(use_cross_encoder=True)
         assert reranker._cross_encoder is not None
 
-    def test_rerank_empty(self):
+    def test_rerank_empty(self) -> None:
         """Test reranking empty list."""
         reranker = HybridReranker(use_cross_encoder=False)
         result = reranker.rerank("test", [])
         assert result == []
 
-    def test_rerank_tfidf_only(self, sample_citations):
+    def test_rerank_tfidf_only(self, sample_citations: list[Citation]) -> None:
         """Test reranking with TF-IDF only."""
         reranker = HybridReranker(use_cross_encoder=False)
         result = reranker.rerank("Python", sample_citations, top_k=2)
@@ -223,7 +223,9 @@ class TestHybridReranker:
         assert any("Python" in c.chunk for c in result)
 
     @patch("sentence_transformers.CrossEncoder")
-    def test_rerank_two_stage(self, mock_ce_class, sample_citations):
+    def test_rerank_two_stage(
+        self, mock_ce_class: MagicMock, sample_citations: list[Citation]
+    ) -> None:
         """Test two-stage reranking (TF-IDF then cross-encoder)."""
         mock_model = MagicMock()
         mock_model.predict.return_value = np.array([0.9, 0.8, 0.3, 0.2])

@@ -1,24 +1,27 @@
 """Integration tests for advanced RAG retrieval features."""
 
 import os
-import pytest
 import tempfile
+from collections.abc import Callable, Generator
+from typing import Any
 from unittest.mock import MagicMock, patch
+
 import numpy as np
+import pytest
 
 from piragi import Ragi
-from piragi.types import Answer, Citation
+from piragi.types import Answer, Chunk
 
 
 @pytest.fixture
-def temp_dir():
+def temp_dir() -> Generator[str, None, None]:
     """Create a temporary directory."""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield tmpdir
 
 
 @pytest.fixture
-def sample_docs_dir(temp_dir):
+def sample_docs_dir(temp_dir: str) -> str:
     """Create sample documents for testing."""
     docs_dir = os.path.join(temp_dir, "docs")
     os.makedirs(docs_dir)
@@ -64,22 +67,24 @@ Variables can be declared with var, let, or const.
 
 
 @pytest.fixture
-def mock_embeddings():
+def mock_embeddings() -> Any:
     """Mock embedding responses (768-dim for all-mpnet-base-v2)."""
     return np.random.rand(768).tolist()
 
 
 @pytest.fixture
-def mock_llm_response():
+def mock_llm_response() -> str:
     """Mock LLM response."""
     return "Python is a high-level programming language known for its clear syntax."
 
 
-def create_mock_embedding_generator(mock_embeddings):
+def create_mock_embedding_generator(mock_embeddings: list[float]) -> MagicMock:
     """Create a mock EmbeddingGenerator for testing."""
     mock_gen = MagicMock()
 
-    def embed_chunks_side_effect(chunks):
+    def embed_chunks_side_effect(
+        chunks: list[Chunk], on_progress: Callable[[str], None] | None = None
+    ) -> list[Chunk]:
         for chunk in chunks:
             chunk.embedding = mock_embeddings
         return chunks
@@ -94,7 +99,13 @@ class TestRagiAdvancedConfig:
 
     @patch("piragi.retrieval.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
-    def test_init_with_hyde(self, mock_embed_gen, mock_openai, temp_dir, mock_embeddings):
+    def test_init_with_hyde(
+        self,
+        mock_embed_gen: MagicMock,
+        mock_openai: MagicMock,
+        temp_dir: str,
+        mock_embeddings: list[float],
+    ) -> None:
         """Test initialization with HyDE enabled."""
         mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
 
@@ -102,7 +113,7 @@ class TestRagiAdvancedConfig:
             persist_dir=os.path.join(temp_dir, "store"),
             config={
                 "retrieval": {"use_hyde": True},
-            }
+            },
         )
 
         assert kb._use_hyde is True
@@ -110,7 +121,13 @@ class TestRagiAdvancedConfig:
 
     @patch("piragi.retrieval.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
-    def test_init_with_hybrid_search(self, mock_embed_gen, mock_openai, temp_dir, mock_embeddings):
+    def test_init_with_hybrid_search(
+        self,
+        mock_embed_gen: MagicMock,
+        mock_openai: MagicMock,
+        temp_dir: str,
+        mock_embeddings: list[float],
+    ) -> None:
         """Test initialization with hybrid search enabled."""
         mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
 
@@ -118,7 +135,7 @@ class TestRagiAdvancedConfig:
             persist_dir=os.path.join(temp_dir, "store"),
             config={
                 "retrieval": {"use_hybrid_search": True},
-            }
+            },
         )
 
         assert kb._use_hybrid_search is True
@@ -126,7 +143,13 @@ class TestRagiAdvancedConfig:
 
     @patch("piragi.retrieval.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
-    def test_init_with_cross_encoder(self, mock_embed_gen, mock_openai, temp_dir, mock_embeddings):
+    def test_init_with_cross_encoder(
+        self,
+        mock_embed_gen: MagicMock,
+        mock_openai: MagicMock,
+        temp_dir: str,
+        mock_embeddings: list[float],
+    ) -> None:
         """Test initialization with cross-encoder reranking enabled."""
         mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
 
@@ -134,7 +157,7 @@ class TestRagiAdvancedConfig:
             persist_dir=os.path.join(temp_dir, "store"),
             config={
                 "retrieval": {"use_cross_encoder": True},
-            }
+            },
         )
 
         assert kb._use_cross_encoder is True
@@ -142,7 +165,13 @@ class TestRagiAdvancedConfig:
 
     @patch("piragi.retrieval.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
-    def test_init_all_advanced_features(self, mock_embed_gen, mock_openai, temp_dir, mock_embeddings):
+    def test_init_all_advanced_features(
+        self,
+        mock_embed_gen: MagicMock,
+        mock_openai: MagicMock,
+        temp_dir: str,
+        mock_embeddings: list[float],
+    ) -> None:
         """Test initialization with all advanced features."""
         mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
 
@@ -156,7 +185,7 @@ class TestRagiAdvancedConfig:
                     "vector_weight": 0.6,
                     "bm25_weight": 0.4,
                 },
-            }
+            },
         )
 
         assert kb._use_hyde is True
@@ -171,8 +200,14 @@ class TestRagiSemanticChunking:
     @patch("piragi.retrieval.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_semantic_chunking_strategy(
-        self, mock_embed_gen, mock_openai, mock_semantic_st, temp_dir, sample_docs_dir, mock_embeddings
-    ):
+        self,
+        mock_embed_gen: MagicMock,
+        mock_openai: MagicMock,
+        mock_semantic_st: MagicMock,
+        temp_dir: str,
+        sample_docs_dir: str,
+        mock_embeddings: list[float],
+    ) -> None:
         """Test initialization with semantic chunking."""
         mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
         mock_instance = MagicMock()
@@ -183,17 +218,22 @@ class TestRagiSemanticChunking:
             persist_dir=os.path.join(temp_dir, "store"),
             config={
                 "chunk": {"strategy": "semantic"},
-            }
+            },
         )
 
         from piragi.semantic_chunking import SemanticChunker
+
         assert isinstance(kb.chunker, SemanticChunker)
 
     @patch("piragi.retrieval.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_hierarchical_chunking_strategy(
-        self, mock_embed_gen, mock_openai, temp_dir, mock_embeddings
-    ):
+        self,
+        mock_embed_gen: MagicMock,
+        mock_openai: MagicMock,
+        temp_dir: str,
+        mock_embeddings: list[float],
+    ) -> None:
         """Test initialization with hierarchical chunking."""
         mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
 
@@ -205,7 +245,7 @@ class TestRagiSemanticChunking:
                     "parent_size": 2000,
                     "child_size": 400,
                 },
-            }
+            },
         )
 
         assert kb._use_hierarchical is True
@@ -216,7 +256,13 @@ class TestRagiQueryValidation:
 
     @patch("piragi.retrieval.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
-    def test_empty_query(self, mock_embed_gen, mock_openai, temp_dir, mock_embeddings):
+    def test_empty_query(
+        self,
+        mock_embed_gen: MagicMock,
+        mock_openai: MagicMock,
+        temp_dir: str,
+        mock_embeddings: list[float],
+    ) -> None:
         """Test handling of empty query."""
         mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
 
@@ -228,7 +274,13 @@ class TestRagiQueryValidation:
 
     @patch("piragi.retrieval.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
-    def test_whitespace_query(self, mock_embed_gen, mock_openai, temp_dir, mock_embeddings):
+    def test_whitespace_query(
+        self,
+        mock_embed_gen: MagicMock,
+        mock_openai: MagicMock,
+        temp_dir: str,
+        mock_embeddings: list[float],
+    ) -> None:
         """Test handling of whitespace-only query."""
         mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
 
@@ -245,8 +297,13 @@ class TestRagiHybridSearchIntegration:
     @patch("piragi.retrieval.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_add_indexes_for_hybrid(
-        self, mock_embed_gen, mock_openai, temp_dir, sample_docs_dir, mock_embeddings
-    ):
+        self,
+        mock_embed_gen: MagicMock,
+        mock_openai: MagicMock,
+        temp_dir: str,
+        sample_docs_dir: str,
+        mock_embeddings: list[float],
+    ) -> None:
         """Test that adding documents indexes for hybrid search."""
         mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
 
@@ -254,7 +311,7 @@ class TestRagiHybridSearchIntegration:
             persist_dir=os.path.join(temp_dir, "store"),
             config={
                 "retrieval": {"use_hybrid_search": True},
-            }
+            },
         )
         kb.add(sample_docs_dir)
 
@@ -265,8 +322,14 @@ class TestRagiHybridSearchIntegration:
     @patch("piragi.retrieval.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_search_uses_hybrid(
-        self, mock_embed_gen, mock_openai, temp_dir, sample_docs_dir, mock_embeddings, mock_llm_response
-    ):
+        self,
+        mock_embed_gen: MagicMock,
+        mock_openai: MagicMock,
+        temp_dir: str,
+        sample_docs_dir: str,
+        mock_embeddings: list[float],
+        mock_llm_response: str,
+    ) -> None:
         """Test that search uses hybrid when enabled."""
         mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
 
@@ -282,7 +345,7 @@ class TestRagiHybridSearchIntegration:
             config={
                 "retrieval": {"use_hybrid_search": True},
                 "llm": {"enable_query_expansion": False},
-            }
+            },
         )
         kb.add(sample_docs_dir)
 
@@ -299,8 +362,15 @@ class TestRagiCrossEncoderIntegration:
     @patch("piragi.retrieval.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_search_uses_cross_encoder(
-        self, mock_embed_gen, mock_openai, mock_ce, temp_dir, sample_docs_dir, mock_embeddings, mock_llm_response
-    ):
+        self,
+        mock_embed_gen: MagicMock,
+        mock_openai: MagicMock,
+        mock_ce: MagicMock,
+        temp_dir: str,
+        sample_docs_dir: str,
+        mock_embeddings: list[float],
+        mock_llm_response: str,
+    ) -> None:
         """Test that search uses cross-encoder when enabled."""
         mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
 
@@ -321,7 +391,7 @@ class TestRagiCrossEncoderIntegration:
             config={
                 "retrieval": {"use_cross_encoder": True},
                 "llm": {"enable_query_expansion": False},
-            }
+            },
         )
         kb.add(sample_docs_dir)
 
@@ -337,8 +407,15 @@ class TestRagiHyDEIntegration:
     @patch("piragi.retrieval.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_search_uses_hyde(
-        self, mock_embed_gen, mock_retrieval_openai, mock_hyde_openai, temp_dir, sample_docs_dir, mock_embeddings, mock_llm_response
-    ):
+        self,
+        mock_embed_gen: MagicMock,
+        mock_retrieval_openai: MagicMock,
+        mock_hyde_openai: MagicMock,
+        temp_dir: str,
+        sample_docs_dir: str,
+        mock_embeddings: list[float],
+        mock_llm_response: str,
+    ) -> None:
         """Test that search uses HyDE when enabled."""
         mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
 
@@ -364,7 +441,7 @@ class TestRagiHyDEIntegration:
             persist_dir=os.path.join(temp_dir, "store"),
             config={
                 "retrieval": {"use_hyde": True},
-            }
+            },
         )
         kb.add(sample_docs_dir)
 
@@ -378,7 +455,13 @@ class TestRagiVectorDimensions:
 
     @patch("piragi.retrieval.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
-    def test_default_dimension_matches_model(self, mock_embed_gen, mock_openai, temp_dir, mock_embeddings):
+    def test_default_dimension_matches_model(
+        self,
+        mock_embed_gen: MagicMock,
+        mock_openai: MagicMock,
+        temp_dir: str,
+        mock_embeddings: list[float],
+    ) -> None:
         """Test that store dimension matches default embedding model."""
         mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
 
@@ -389,7 +472,13 @@ class TestRagiVectorDimensions:
 
     @patch("piragi.retrieval.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
-    def test_custom_model_dimension(self, mock_embed_gen, mock_openai, temp_dir, mock_embeddings):
+    def test_custom_model_dimension(
+        self,
+        mock_embed_gen: MagicMock,
+        mock_openai: MagicMock,
+        temp_dir: str,
+        mock_embeddings: list[float],
+    ) -> None:
         """Test that store dimension matches custom embedding model."""
         mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
 
@@ -397,7 +486,7 @@ class TestRagiVectorDimensions:
             persist_dir=os.path.join(temp_dir, "store"),
             config={
                 "embedding": {"model": "all-MiniLM-L6-v2"},
-            }
+            },
         )
 
         # MiniLM is 384 dim

@@ -2,6 +2,7 @@
 
 import sys
 import urllib.request
+
 from piragi import Ragi
 
 
@@ -62,9 +63,9 @@ our-cli deploy production
     # Initialize Ragi with Ollama
     # Using a public embedding model (no auth required)
     print("Initializing Ragi with Ollama (llama3.2)...")
-    kb = Ragi("sample_doc.txt", config={
-        "embedding": {"model": "sentence-transformers/all-MiniLM-L6-v2"}
-    })
+    kb = Ragi(
+        "sample_doc.txt", config={"embedding": {"model": "sentence-transformers/all-MiniLM-L6-v2"}}
+    )
     print(f"✓ Loaded {kb.count()} chunks\n")
 
     # Example 1: Basic question
@@ -99,19 +100,22 @@ our-cli deploy production
     print("Trying to use 'mistral' model (if available)...\n")
 
     try:
-        kb_mistral = Ragi("sample_doc.txt", config={
-            "llm": {"model": "mistral"},
-            "embedding": {"model": "sentence-transformers/all-MiniLM-L6-v2"}
-        })
+        kb_mistral = Ragi(
+            "sample_doc.txt",
+            config={
+                "llm": {"model": "mistral"},
+                "embedding": {"model": "sentence-transformers/all-MiniLM-L6-v2"},
+            },
+        )
 
         question = "How does authentication work?"
         print(f"Q: {question}\n")
 
         answer = kb_mistral.ask(question)
         print(f"A: {answer.text}\n")
-    except Exception as e:
-        print(f"⚠️  Skipped: mistral model not available")
-        print(f"   To use it: ollama pull mistral\n")
+    except Exception:
+        print("⚠️  Skipped: mistral model not available")
+        print("   To use it: ollama pull mistral\n")
 
     # Example 4: Multiple sources
     print("=" * 60)
@@ -139,9 +143,10 @@ Deletes a user by ID.
         )
 
     print("Loading multiple documents...")
-    kb_multi = Ragi(["sample_doc.txt", "api_doc.txt"], config={
-        "embedding": {"model": "sentence-transformers/all-MiniLM-L6-v2"}
-    })
+    kb_multi = Ragi(
+        ["sample_doc.txt", "api_doc.txt"],
+        config={"embedding": {"model": "sentence-transformers/all-MiniLM-L6-v2"}},
+    )
     print(f"✓ Loaded {kb_multi.count()} chunks from multiple files\n")
 
     question = "What API endpoints are available?"
@@ -152,6 +157,7 @@ Deletes a user by ID.
 
     # Cleanup
     import os
+
     os.remove("sample_doc.txt")
     os.remove("api_doc.txt")
     kb.clear()

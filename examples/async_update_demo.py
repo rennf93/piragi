@@ -3,12 +3,12 @@
 import os
 import tempfile
 import time
-import threading
+
 from piragi import Ragi
-from ragi.async_updater import AsyncUpdater
+from piragi.async_updater import AsyncUpdater
 
 
-def main():
+def main() -> None:
     """Simple async update demonstration."""
     print("Async Auto-Update Demo")
     print("=" * 60)
@@ -38,7 +38,7 @@ def main():
         )
 
         # Register source
-        with open(doc_path, "r") as f:
+        with open(doc_path) as f:
             updater.register_source(doc_path, f.read(), check_interval=2.0)
 
         # Start background worker
@@ -56,7 +56,9 @@ def main():
         for i in range(5):
             time.sleep(1)
             stats = updater.get_stats()
-            print(f"   [{i+1}s] Checks: {stats['checks_performed']}, Updates: {stats['updates_performed']}")
+            print(
+                f"   [{i + 1}s] Checks: {stats['checks_performed']}, Updates: {stats['updates_performed']}"  # noqa: E501
+            )
 
         # Final stats
         print("\n6. Final statistics:")

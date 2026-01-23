@@ -10,6 +10,9 @@ Run with:
 
 import os
 import sys
+from collections.abc import Generator
+from pathlib import Path
+
 import pytest
 
 # Add src to path for local development
@@ -17,7 +20,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from piragi import Ragi
 from piragi.stores.supabase import SupabaseStore
-
 
 # Skip all tests if credentials not available
 pytestmark = pytest.mark.skipif(
@@ -27,7 +29,7 @@ pytestmark = pytest.mark.skipif(
 
 
 @pytest.fixture
-def store():
+def store() -> Generator[SupabaseStore, None, None]:
     """Create a fresh store for each test."""
     s = SupabaseStore()
     s.clear()
@@ -36,7 +38,7 @@ def store():
 
 
 @pytest.fixture
-def test_file(tmp_path):
+def test_file(tmp_path: Path) -> str:
     """Create a temporary test document."""
     content = """
 # Test Document
@@ -57,28 +59,28 @@ The second section discusses vector databases and embeddings.
 class TestSupabaseStore:
     """Test suite for SupabaseStore."""
 
-    def test_init_with_env_vars(self):
+    def test_init_with_env_vars(self) -> None:
         """Store initializes with environment variables."""
         store = SupabaseStore()
         assert store.url is not None
         assert store.key is not None
 
-    def test_init_missing_credentials(self, monkeypatch):
+    def test_init_missing_credentials(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Store raises error when credentials missing."""
         monkeypatch.delenv("SUPABASE_URL", raising=False)
         monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
-        
+
         with pytest.raises(ValueError, match="Supabase URL and key required"):
             SupabaseStore()
 
-    def test_count_empty(self, store):
+    def test_count_empty(self, store: SupabaseStore) -> None:
         """Empty store returns count of 0."""
         assert store.count() == 0
 
-    def test_add_and_count(self, store, test_file):
+    def test_add_and_count(self, store: SupabaseStore, test_file: str) -> None:
         """Adding chunks increases count."""
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
-        
+
         kb = Ragi(
             test_file,
             store=store,
@@ -87,13 +89,13 @@ class TestSupabaseStore:
                 "auto_update": {"enabled": False},
             },
         )
-        
+
         assert kb.count() > 0
 
-    def test_search_returns_results(self, store, test_file):
+    def test_search_returns_results(self, store: SupabaseStore, test_file: str) -> None:
         """Search returns relevant results."""
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
-        
+
         kb = Ragi(
             test_file,
             store=store,
@@ -102,16 +104,16 @@ class TestSupabaseStore:
                 "auto_update": {"enabled": False},
             },
         )
-        
+
         results = kb.retrieve("vector databases", top_k=2)
-        
+
         assert len(results) > 0
         assert results[0].score > 0
 
-    def test_delete_by_source(self, store, test_file):
+    def test_delete_by_source(self, store: SupabaseStore, test_file: str) -> None:
         """Deleting by source removes chunks."""
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
-        
+
         kb = Ragi(
             test_file,
             store=store,
@@ -120,19 +122,19 @@ class TestSupabaseStore:
                 "auto_update": {"enabled": False},
             },
         )
-        
+
         initial_count = kb.count()
         assert initial_count > 0
-        
+
         deleted = store.delete_by_source(test_file)
-        
+
         assert deleted == initial_count
         assert store.count() == 0
 
-    def test_clear(self, store, test_file):
+    def test_clear(self, store: SupabaseStore, test_file: str) -> None:
         """Clear removes all chunks."""
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
-        
+
         kb = Ragi(
             test_file,
             store=store,
@@ -141,17 +143,17 @@ class TestSupabaseStore:
                 "auto_update": {"enabled": False},
             },
         )
-        
+
         assert kb.count() > 0
-        
+
         store.clear()
-        
+
         assert store.count() == 0
 
-    def test_get_all_chunk_texts(self, store, test_file):
+    def test_get_all_chunk_texts(self, store: SupabaseStore, test_file: str) -> None:
         """get_all_chunk_texts returns texts for hybrid search."""
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
-        
+
         kb = Ragi(
             test_file,
             store=store,
@@ -160,9 +162,9 @@ class TestSupabaseStore:
                 "auto_update": {"enabled": False},
             },
         )
-        
+
         texts = store.get_all_chunk_texts()
-        
+
         assert len(texts) == kb.count()
         assert all(isinstance(t, str) for t in texts)
 

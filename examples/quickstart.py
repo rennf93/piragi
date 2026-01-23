@@ -42,9 +42,9 @@ That's it!
 
     # Initialize Ragi with the sample document
     print("Loading documents...")
-    kb = Ragi("sample.txt", config={
-        "embedding": {"model": "sentence-transformers/all-MiniLM-L6-v2"}
-    })
+    kb = Ragi(
+        "sample.txt", config={"embedding": {"model": "sentence-transformers/all-MiniLM-L6-v2"}}
+    )
 
     print(f"Loaded {kb.count()} chunks\n")
 

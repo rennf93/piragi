@@ -1,9 +1,9 @@
 """Tests for type definitions."""
 
-from piragi.types import Answer, Citation, Chunk, Document
+from piragi.types import Answer, Chunk, Citation, Document
 
 
-def test_citation_creation():
+def test_citation_creation() -> None:
     """Test creating a citation."""
     citation = Citation(
         source="test.txt",
@@ -18,7 +18,7 @@ def test_citation_creation():
     assert citation.metadata["type"] == "test"
 
 
-def test_citation_preview():
+def test_citation_preview() -> None:
     """Test citation preview for long chunks."""
     long_text = "a" * 150
     citation = Citation(source="test.txt", chunk=long_text, score=0.9)
@@ -28,7 +28,7 @@ def test_citation_preview():
     assert preview.endswith("...")
 
 
-def test_citation_preview_short():
+def test_citation_preview_short() -> None:
     """Test citation preview for short chunks."""
     short_text = "Short text"
     citation = Citation(source="test.txt", chunk=short_text, score=0.9)
@@ -38,7 +38,7 @@ def test_citation_preview_short():
     assert not preview.endswith("...")
 
 
-def test_answer_creation():
+def test_answer_creation() -> None:
     """Test creating an answer."""
     citations = [
         Citation(source="test1.txt", chunk="Chunk 1", score=0.9),
@@ -56,13 +56,13 @@ def test_answer_creation():
     assert answer.query == "What is the question?"
 
 
-def test_answer_str():
+def test_answer_str() -> None:
     """Test Answer string representation."""
     answer = Answer(text="Test answer", citations=[], query="Test query")
     assert str(answer) == "Test answer"
 
 
-def test_answer_repr():
+def test_answer_repr() -> None:
     """Test Answer repr."""
     citations = [Citation(source="test.txt", chunk="Test", score=0.9)]
     answer = Answer(text="Long answer text here", citations=citations, query="Test")
@@ -72,7 +72,7 @@ def test_answer_repr():
     assert "citations=1" in repr_str
 
 
-def test_document_creation():
+def test_document_creation() -> None:
     """Test creating a document."""
     doc = Document(
         content="# Test\nContent here.",
@@ -85,7 +85,7 @@ def test_document_creation():
     assert doc.metadata["type"] == "markdown"
 
 
-def test_chunk_creation():
+def test_chunk_creation() -> None:
     """Test creating a chunk."""
     chunk = Chunk(
         text="Chunk text",
@@ -100,7 +100,7 @@ def test_chunk_creation():
     assert chunk.embedding is None
 
 
-def test_chunk_with_embedding():
+def test_chunk_with_embedding() -> None:
     """Test chunk with embedding."""
     embedding = [0.1] * 1536
     chunk = Chunk(

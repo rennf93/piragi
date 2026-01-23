@@ -2,20 +2,20 @@
 
 import os
 import tempfile
-from pathlib import Path
+from collections.abc import Generator
 
 import pytest
 
 
 @pytest.fixture
-def temp_dir():
+def temp_dir() -> Generator[str, None, None]:
     """Create a temporary directory for tests."""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield tmpdir
 
 
 @pytest.fixture
-def sample_text_file(temp_dir):
+def sample_text_file(temp_dir: str) -> str:
     """Create a sample text file."""
     file_path = os.path.join(temp_dir, "sample.txt")
     content = """# Sample Document
@@ -36,7 +36,7 @@ This section contains information about feature B.
 
 
 @pytest.fixture
-def sample_markdown_file(temp_dir):
+def sample_markdown_file(temp_dir: str) -> str:
     """Create a sample markdown file."""
     file_path = os.path.join(temp_dir, "README.md")
     content = """# API Documentation
@@ -59,7 +59,7 @@ Creates a new user.
 
 
 @pytest.fixture
-def sample_code_file(temp_dir):
+def sample_code_file(temp_dir: str) -> str:
     """Create a sample code file."""
     file_path = os.path.join(temp_dir, "example.py")
     content = '''"""Example module."""
@@ -81,7 +81,7 @@ class Calculator:
 
 
 @pytest.fixture(autouse=True)
-def mock_llm_env(monkeypatch):
+def mock_llm_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Mock LLM environment variables for tests."""
     monkeypatch.setenv("LLM_BASE_URL", "http://localhost:11434/v1")
     monkeypatch.setenv("LLM_API_KEY", "not-needed")

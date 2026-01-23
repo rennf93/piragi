@@ -6,7 +6,23 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+      - run: pip install uv
+      - run: uv sync --extra dev
+      - run: uv run pre-commit run --all-files
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -15,31 +31,25 @@ jobs:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v5
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        run: |
+          pip install uv
 
       - name: Install dependencies
-        run: uv pip install -e ".[dev]" --system
-
-      - name: Run ruff check
-        run: ruff check src/
-
-      - name: Run ruff format check
-        run: ruff format src/ --check
-
-      - name: Run mypy
-        run: mypy src/piragi/ --ignore-missing-imports
-        continue-on-error: true
+        run: |
+          uv sync --extra dev
 
       - name: Run tests
-        run: pytest tests/ -v --cov=piragi --cov-report=xml
+        run: |
+          uv run pytest -v --cov=piragi --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -47,25 +57,3 @@ jobs:
         with:
           files: ./coverage.xml
           fail_ci_if_error: false
-
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-
-      - name: Install ruff
-        run: uv pip install ruff --system
-
-      - name: Run ruff check
-        run: ruff check src/
-
-      - name: Run ruff format check
-        run: ruff format src/ --check

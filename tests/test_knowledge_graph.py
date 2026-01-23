@@ -19,9 +19,11 @@ def test_knowledge_graph_import_error():
     original_nx = kg_module._nx
     kg_module._nx = None
 
-    with patch.dict("sys.modules", {"networkx": None}):
-        with pytest.raises(ImportError, match="pip install piragi"):
-            kg_module._get_networkx()
+    with (
+        patch.dict("sys.modules", {"networkx": None}),
+        pytest.raises(ImportError, match="pip install piragi"),
+    ):
+        kg_module._get_networkx()
 
     # Restore
     kg_module._nx = original_nx

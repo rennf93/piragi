@@ -60,7 +60,7 @@ class TestRetrySyncDecorator:
         call_count = 0
 
         @retry_sync(max_retries=3)
-        def succeeds():
+        def succeeds() -> str | None:
             nonlocal call_count
             call_count += 1
             return "success"
@@ -74,7 +74,7 @@ class TestRetrySyncDecorator:
         call_count = 0
 
         @retry_sync(max_retries=3, base_delay=0.01)
-        def fails_then_succeeds():
+        def fails_then_succeeds() -> str | None:
             nonlocal call_count
             call_count += 1
             if call_count < 3:
@@ -90,7 +90,7 @@ class TestRetrySyncDecorator:
         call_count = 0
 
         @retry_sync(max_retries=3)
-        def fails_with_bad_error():
+        def fails_with_bad_error() -> None:
             nonlocal call_count
             call_count += 1
             raise ValueError("Invalid input")
@@ -104,7 +104,7 @@ class TestRetrySyncDecorator:
         call_count = 0
 
         @retry_sync(max_retries=2, base_delay=0.01)
-        def always_fails():
+        def always_fails() -> None:
             nonlocal call_count
             call_count += 1
             raise Exception("Connection timeout")
@@ -119,11 +119,11 @@ class TestRetrySyncDecorator:
         start_time = time.time()
 
         @retry_sync(max_retries=3, base_delay=0.05, max_delay=1.0)
-        def fails_with_timing():
+        def fails_with_timing() -> None:
             delays.append(time.time() - start_time)
-            raise Exception("timeout")
+            raise TimeoutError("timeout")
 
-        with pytest.raises(Exception):
+        with pytest.raises(TimeoutError):
             fails_with_timing()
 
         # Check that delays roughly follow exponential pattern
@@ -140,10 +140,10 @@ class TestRetrySyncDecorator:
             retry_calls.append((str(error), attempt))
 
         @retry_sync(max_retries=2, base_delay=0.01, on_retry=on_retry)
-        def fails_twice():
-            raise Exception("timeout")
+        def fails_twice() -> None:
+            raise TimeoutError("timeout")
 
-        with pytest.raises(Exception):
+        with pytest.raises(TimeoutError):
             fails_twice()
 
         assert len(retry_calls) == 2
@@ -160,7 +160,7 @@ class TestRetryAsyncDecorator:
         call_count = 0
 
         @retry_async(max_retries=3)
-        async def succeeds():
+        async def succeeds() -> str | None:
             nonlocal call_count
             call_count += 1
             return "success"
@@ -175,7 +175,7 @@ class TestRetryAsyncDecorator:
         call_count = 0
 
         @retry_async(max_retries=3, base_delay=0.01)
-        async def fails_then_succeeds():
+        async def fails_then_succeeds() -> str | None:
             nonlocal call_count
             call_count += 1
             if call_count < 3:
@@ -192,7 +192,7 @@ class TestRetryAsyncDecorator:
         call_count = 0
 
         @retry_async(max_retries=3)
-        async def fails_with_bad_error():
+        async def fails_with_bad_error() -> None:
             nonlocal call_count
             call_count += 1
             raise ValueError("Invalid input")
@@ -207,7 +207,7 @@ class TestRetryAsyncDecorator:
         call_count = 0
 
         @retry_async(max_retries=2, base_delay=0.01)
-        async def always_fails():
+        async def always_fails() -> None:
             nonlocal call_count
             call_count += 1
             raise Exception("Connection timeout")
@@ -236,7 +236,7 @@ class TestRetryConfig:
         config = RetryConfig(max_retries=2, base_delay=0.01)
         call_count = 0
 
-        def fails_then_succeeds():
+        def fails_then_succeeds() -> str | None:
             nonlocal call_count
             call_count += 1
             if call_count < 2:
@@ -254,7 +254,7 @@ class TestRetryConfig:
         config = RetryConfig(max_retries=2, base_delay=0.01)
         call_count = 0
 
-        async def fails_then_succeeds():
+        async def fails_then_succeeds() -> str | None:
             nonlocal call_count
             call_count += 1
             if call_count < 2:

@@ -1,16 +1,17 @@
 """Core Ragi class - the main interface for piragi."""
 
 import logging
-from typing import Any, Dict, List, Optional, Union
+from collections.abc import Callable
+from typing import Any
 
+from .async_updater import AsyncUpdater
+from .change_detection import ChangeDetector
 from .chunking import Chunker
 from .embeddings import EmbeddingGenerator
 from .loader import DocumentLoader
 from .retrieval import Retriever
 from .stores import VectorStoreProtocol, create_store
-from .types import Answer, Document, ChunkHook, DocumentHook
-from .async_updater import AsyncUpdater
-from .change_detection import ChangeDetector
+from .types import Answer, Chunk, ChunkHook, Document, DocumentHook
 
 logger = logging.getLogger(__name__)
 
@@ -47,13 +48,13 @@ class Ragi:
 
     def __init__(
         self,
-        sources: Union[str, List[str], None] = None,
+        sources: str | list[str] | None = None,
         persist_dir: str = ".piragi",
-        config: Optional[Dict[str, Any]] = None,
-        store: Union[str, Dict[str, Any], VectorStoreProtocol, None] = None,
-        hooks: Optional[Dict[str, Any]] = None,
+        config: dict[str, Any] | None = None,
+        store: str | dict[str, Any] | VectorStoreProtocol | None = None,
+        hooks: dict[str, Any] | None = None,
         graph: bool = False,
-        embedder: Optional[EmbeddingGenerator] = None,
+        embedder: EmbeddingGenerator | None = None,
     ) -> None:
         """
         Initialize Ragi with optional document sources.
@@ -143,7 +144,7 @@ class Ragi:
             ...         "use_cross_encoder": True,
             ...     }
             ... })
-        """
+        """  # noqa: E501
         # Initialize config
         cfg = config or {}
 
@@ -157,8 +158,12 @@ class Ragi:
         chunk_cfg = cfg.get("chunk", {})
         chunk_strategy = chunk_cfg.get("strategy", "fixed")
 
+        # Chunker can be any of the chunking strategies
+        self.chunker: Any = None
+
         if chunk_strategy == "semantic":
             from .semantic_chunking import SemanticChunker
+
             self.chunker = SemanticChunker(
                 similarity_threshold=chunk_cfg.get("similarity_threshold", 0.5),
                 min_chunk_size=chunk_cfg.get("min_size", 100),
@@ -166,6 +171,7 @@ class Ragi:
             )
         elif chunk_strategy == "contextual":
             from .semantic_chunking import ContextualChunker
+
             llm_cfg = cfg.get("llm", {})
             self.chunker = ContextualChunker(
                 model=llm_cfg.get("model", "llama3.2"),
@@ -174,6 +180,7 @@ class Ragi:
             )
         elif chunk_strategy == "hierarchical":
             from .semantic_chunking import HierarchicalChunker
+
             self.chunker = HierarchicalChunker(
                 parent_chunk_size=chunk_cfg.get("parent_size", 2000),
                 child_chunk_size=chunk_cfg.get("child_size", 400),
@@ -227,6 +234,7 @@ class Ragi:
 
         if self._use_hyde:
             from .query_transform import HyDE
+
             self._hyde = HyDE(
                 model=llm_cfg.get("model", "llama3.2"),
                 api_key=llm_cfg.get("api_key"),
@@ -235,6 +243,7 @@ class Ragi:
 
         if self._use_hybrid_search:
             from .hybrid_search import HybridSearcher
+
             self._hybrid_searcher = HybridSearcher(
                 vector_weight=retrieval_cfg.get("vector_weight", 0.5),
                 bm25_weight=retrieval_cfg.get("bm25_weight", 0.5),
@@ -243,10 +252,10 @@ class Ragi:
 
         if self._use_cross_encoder:
             from .reranker import CrossEncoderReranker
+
             self._cross_encoder = CrossEncoderReranker(
                 model_name=retrieval_cfg.get(
-                    "cross_encoder_model",
-                    "cross-encoder/ms-marco-MiniLM-L-6-v2"
+                    "cross_encoder_model", "cross-encoder/ms-marco-MiniLM-L-6-v2"
                 ),
                 device=retrieval_cfg.get("cross_encoder_device", embed_cfg.get("device")),
                 trust_remote_code=retrieval_cfg.get("trust_remote_code", False),
@@ -259,23 +268,24 @@ class Ragi:
             base_url=llm_cfg.get("base_url"),
             temperature=llm_cfg.get("temperature", 0.1),
             enable_reranking=llm_cfg.get("enable_reranking", True) and not self._use_cross_encoder,
-            enable_query_expansion=llm_cfg.get("enable_query_expansion", True) and not self._use_hyde,
+            enable_query_expansion=llm_cfg.get("enable_query_expansion", True)
+            and not self._use_hyde,
         )
 
         # State for filtering
-        self._filters: Optional[Dict[str, Any]] = None
+        self._filters: dict[str, Any] | None = None
 
         # Processing hooks
         hooks_cfg = hooks or {}
-        self._post_load_hook: Optional[DocumentHook] = hooks_cfg.get("post_load")
-        self._post_chunk_hook: Optional[ChunkHook] = hooks_cfg.get("post_chunk")
-        self._post_embed_hook: Optional[ChunkHook] = hooks_cfg.get("post_embed")
+        self._post_load_hook: DocumentHook | None = hooks_cfg.get("post_load")
+        self._post_chunk_hook: ChunkHook | None = hooks_cfg.get("post_chunk")
+        self._post_embed_hook: ChunkHook | None = hooks_cfg.get("post_embed")
 
         # Auto-update setup
         auto_update_cfg = cfg.get("auto_update", {})
         self._auto_update_enabled = auto_update_cfg.get("enabled", True)
-        self._updater: Optional[AsyncUpdater] = None
-        self._tracked_sources: Dict[str, Document] = {}
+        self._updater: AsyncUpdater | None = None
+        self._tracked_sources: dict[str, Document] = {}
 
         if self._auto_update_enabled:
             interval = auto_update_cfg.get("interval", 300.0)
@@ -293,8 +303,10 @@ class Ragi:
         self._graph = None
 
         if graph:
-            from .knowledge_graph import KnowledgeGraph
             import os
+
+            from .knowledge_graph import KnowledgeGraph
+
             graph_path = os.path.join(persist_dir, "graph.json")
             self._graph = KnowledgeGraph(persist_path=graph_path)
 
@@ -304,8 +316,8 @@ class Ragi:
 
     def add(
         self,
-        sources: Union[str, List[str]],
-        on_progress: Optional[callable] = None,
+        sources: str | list[str],
+        on_progress: Callable[[str], None] | None = None,
     ) -> "Ragi":
         """
         Add documents to the knowledge base.
@@ -318,6 +330,7 @@ class Ragi:
         Returns:
             Self for chaining
         """
+
         def _progress(msg: str) -> None:
             if on_progress:
                 on_progress(msg)
@@ -332,17 +345,23 @@ class Ragi:
             documents = self._post_load_hook(documents)
 
         # Chunk documents
-        all_chunks = []
+        all_chunks: list[Chunk] = []
         for i, doc in enumerate(documents, 1):
             _progress(f"Chunking {i}/{len(documents)}: {doc.source}")
             if self._use_hierarchical:
                 # Hierarchical chunking returns (parents, children)
                 # We store children for retrieval but keep parent context
                 parent_chunks, child_chunks = self.chunker.chunk_document(doc)
-                all_chunks.extend(child_chunks)
+                if isinstance(child_chunks, list):
+                    all_chunks.extend(child_chunks)
+                else:
+                    all_chunks.append(child_chunks)
             else:
                 chunks = self.chunker.chunk_document(doc)
-                all_chunks.extend(chunks)
+                if isinstance(chunks, list):
+                    all_chunks.extend(chunks)
+                else:
+                    all_chunks.append(chunks)
 
         _progress(f"Created {len(all_chunks)} chunks")
 
@@ -373,7 +392,7 @@ class Ragi:
             for chunk in chunks_with_embeddings:
                 self._graph.extract_and_add(
                     text=chunk.text,
-                    llm_client=self.retriever._client,
+                    llm_client=self.retriever.client,
                     model=llm_cfg.get("model", "llama3.2"),
                 )
             self._graph.save()
@@ -389,18 +408,16 @@ class Ragi:
                 self._tracked_sources[doc.source] = doc
                 # Register with updater
                 if ChangeDetector.is_url(doc.source):
-                    metadata = ChangeDetector.get_url_metadata(doc.source, doc.content)
+                    ChangeDetector.get_url_metadata(doc.source, doc.content)
                 else:
-                    metadata = ChangeDetector.get_file_metadata(doc.source, doc.content)
+                    ChangeDetector.get_file_metadata(doc.source, doc.content)
 
-                self._updater.register_source(
-                    doc.source, doc.content, check_interval=None
-                )
+                self._updater.register_source(doc.source, doc.content, check_interval=None)
 
         _progress("Done")
         return self
 
-    def _background_refresh(self, source: Union[str, List[str]]) -> None:
+    def _background_refresh(self, source: str | list[str]) -> None:
         """
         Internal method called by background updater.
         Refreshes sources without user interaction.
@@ -415,7 +432,7 @@ class Ragi:
         self,
         query: str,
         top_k: int = 5,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
     ) -> Answer:
         """
         Ask a question and get an answer with citations.
@@ -540,7 +557,7 @@ class Ragi:
         self,
         query: str,
         top_k: int = 5,
-    ) -> List:
+    ) -> list:
         """
         Retrieve relevant chunks without LLM generation.
 
@@ -563,7 +580,6 @@ class Ragi:
             >>> context = "\\n".join(c.chunk for c in chunks)
             >>> response = your_llm(f"Based on: {context}\\n\\nQ: {query}")
         """
-        from .types import Citation
 
         # Validate query
         if not query or not query.strip():
@@ -643,7 +659,7 @@ class Ragi:
 
         return all_citations
 
-    def _expand_to_parent_context(self, citations: List) -> List:
+    def _expand_to_parent_context(self, citations: list) -> list:
         """
         Expand child chunks to include parent context.
 
@@ -661,10 +677,7 @@ class Ragi:
                         source=citation.source,
                         chunk=citation.metadata["parent_text"],
                         score=citation.score,
-                        metadata={
-                            k: v for k, v in citation.metadata.items()
-                            if k != "parent_text"
-                        },
+                        metadata={k: v for k, v in citation.metadata.items() if k != "parent_text"},
                     )
                 )
             else:
@@ -707,7 +720,7 @@ class Ragi:
         return self.store.count()
 
     @property
-    def graph(self):
+    def graph(self) -> Any:
         """
         Access the knowledge graph for direct queries.
 
@@ -722,7 +735,7 @@ class Ragi:
         """
         return self._graph
 
-    def refresh(self, sources: Union[str, List[str]]) -> "Ragi":
+    def refresh(self, sources: str | list[str]) -> "Ragi":
         """
         Refresh specific sources by deleting old chunks and re-adding.
         Useful when documents have been updated.
@@ -745,7 +758,7 @@ class Ragi:
 
         # Delete old chunks for each source
         for doc in documents:
-            deleted = self.store.delete_by_source(doc.source)
+            self.store.delete_by_source(doc.source)
 
         # Re-add the documents
         all_chunks = []
@@ -774,7 +787,7 @@ class Ragi:
         if self._graph:
             self._graph.clear()
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Cleanup on deletion."""
         if hasattr(self, "_updater") and self._updater:
             self._updater.stop()

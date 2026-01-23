@@ -1,44 +1,65 @@
 """Tests for vector store implementations."""
 
-import pytest
-from unittest.mock import MagicMock, patch
-import tempfile
 import shutil
+import tempfile
+from collections.abc import Generator
+from typing import Any
+from unittest.mock import MagicMock
 
-from piragi.types import Chunk, Citation
+import pytest
+
 from piragi.stores import (
-    VectorStoreProtocol,
     LanceStore,
-    PostgresStore,
     PineconeStore,
+    PostgresStore,
+    VectorStoreProtocol,
 )
-from piragi.stores.factory import parse_store_uri, create_store
+from piragi.stores.factory import create_store, parse_store_uri
+from piragi.types import Chunk, Citation
 
 
 class TestVectorStoreProtocol:
     """Tests for the VectorStore protocol."""
 
-    def test_protocol_check(self):
+    def test_protocol_check(self) -> None:
         """Test that stores implement the protocol."""
         # LanceStore should implement the protocol
         store = LanceStore(uri=tempfile.mkdtemp())
         assert isinstance(store, VectorStoreProtocol)
 
-    def test_custom_store_protocol(self):
+    def test_custom_store_protocol(self) -> None:
         """Test that custom stores can implement the protocol."""
+
         class CustomStore:
-            def add_chunks(self, chunks):
+            def __init__(self) -> None:
+                self._vector_dimension = 768
+
+            def add_chunks(self, chunks: list[Chunk]) -> None:
                 pass
-            def search(self, query_embedding, top_k=5, filters=None):
+
+            def search(
+                self,
+                query_embedding: list[float],
+                top_k: int = 5,
+                filters: dict[str, Any] | None = None,
+            ) -> list[Citation]:
                 return []
-            def delete_by_source(self, source):
+
+            def delete_by_source(self, source: str) -> int:
                 return 0
-            def count(self):
+
+            def count(self) -> int:
                 return 0
-            def clear(self):
+
+            def clear(self) -> None:
                 pass
-            def get_all_chunk_texts(self):
+
+            def get_all_chunk_texts(self) -> list[str]:
                 return []
+
+            @property
+            def vector_dimension(self) -> int:
+                return self._vector_dimension
 
         store = CustomStore()
         assert isinstance(store, VectorStoreProtocol)
@@ -47,36 +68,36 @@ class TestVectorStoreProtocol:
 class TestParseStoreUri:
     """Tests for URI parsing."""
 
-    def test_local_path(self):
+    def test_local_path(self) -> None:
         """Test parsing local paths."""
         result = parse_store_uri(".piragi")
         assert result["type"] == "lance"
         assert result["uri"] == ".piragi"
 
-    def test_local_path_with_slash(self):
+    def test_local_path_with_slash(self) -> None:
         """Test parsing local paths with slashes."""
         result = parse_store_uri("./data/vectors")
         assert result["type"] == "lance"
         assert result["uri"] == "./data/vectors"
 
-    def test_s3_uri(self):
+    def test_s3_uri(self) -> None:
         """Test parsing S3 URIs."""
         result = parse_store_uri("s3://my-bucket/indices")
         assert result["type"] == "lance"
         assert result["uri"] == "s3://my-bucket/indices"
 
-    def test_postgres_uri(self):
+    def test_postgres_uri(self) -> None:
         """Test parsing PostgreSQL URIs."""
         result = parse_store_uri("postgres://user:pass@localhost:5432/db")
         assert result["type"] == "postgres"
         assert result["connection_string"] == "postgres://user:pass@localhost:5432/db"
 
-    def test_postgresql_uri(self):
+    def test_postgresql_uri(self) -> None:
         """Test parsing PostgreSQL URIs with full scheme."""
         result = parse_store_uri("postgresql://user:pass@localhost/db")
         assert result["type"] == "postgres"
 
-    def test_pinecone_uri(self):
+    def test_pinecone_uri(self) -> None:
         """Test parsing Pinecone URIs."""
         result = parse_store_uri("pinecone://my-index?api_key=abc123&environment=us-east-1")
         assert result["type"] == "pinecone"
@@ -84,7 +105,7 @@ class TestParseStoreUri:
         assert result["api_key"] == "abc123"
         assert result["environment"] == "us-east-1"
 
-    def test_pinecone_uri_with_namespace(self):
+    def test_pinecone_uri_with_namespace(self) -> None:
         """Test parsing Pinecone URIs with namespace."""
         result = parse_store_uri("pinecone://my-index?api_key=abc&namespace=prod")
         assert result["namespace"] == "prod"
@@ -93,45 +114,50 @@ class TestParseStoreUri:
 class TestCreateStore:
     """Tests for the store factory."""
 
-    def test_create_default_store(self):
+    def test_create_default_store(self) -> None:
         """Test creating default LanceStore."""
         with tempfile.TemporaryDirectory() as tmpdir:
             store = create_store(persist_dir=tmpdir)
             assert isinstance(store, LanceStore)
 
-    def test_create_from_path(self):
+    def test_create_from_path(self) -> None:
         """Test creating store from local path."""
         with tempfile.TemporaryDirectory() as tmpdir:
             store = create_store(store=tmpdir)
             assert isinstance(store, LanceStore)
 
-    def test_create_from_s3_uri(self):
+    def test_create_from_s3_uri(self) -> None:
         """Test creating store from S3 URI."""
         # This will create a LanceStore configured for S3
         # Note: Won't actually connect to S3 without credentials
-        with pytest.raises(Exception):
-            # Should fail without S3 credentials, but proves URI parsing works
-            store = create_store(store="s3://nonexistent-bucket/path")
+        # Skip if AWS credentials are set to avoid real S3 calls
+        import os
 
-    def test_create_from_dict(self):
+        if os.environ.get("AWS_ACCESS_KEY_ID") or os.environ.get("AWS_SECRET_ACCESS_KEY"):
+            pytest.skip("AWS credentials set, skipping S3 test to avoid real API calls")
+        with pytest.raises((OSError, ValueError, ImportError, RuntimeError)):
+            # Should fail without S3 credentials, but proves URI parsing works
+            create_store(store="s3://nonexistent-bucket/path")
+
+    def test_create_from_dict(self) -> None:
         """Test creating store from config dict."""
         with tempfile.TemporaryDirectory() as tmpdir:
             store = create_store(store={"type": "lance", "uri": tmpdir})
             assert isinstance(store, LanceStore)
 
-    def test_passthrough_existing_store(self):
+    def test_passthrough_existing_store(self) -> None:
         """Test that existing stores are passed through."""
         with tempfile.TemporaryDirectory() as tmpdir:
             existing = LanceStore(uri=tmpdir)
             result = create_store(store=existing)
             assert result is existing
 
-    def test_create_postgres_requires_deps(self):
+    def test_create_postgres_requires_deps(self) -> None:
         """Test that PostgresStore requires dependencies."""
         with pytest.raises((ImportError, Exception)):
             create_store(store={"type": "postgres", "host": "localhost"})
 
-    def test_create_pinecone_requires_api_key(self):
+    def test_create_pinecone_requires_api_key(self) -> None:
         """Test that PineconeStore requires API key."""
         with pytest.raises(ValueError, match="api_key"):
             create_store(store={"type": "pinecone", "index_name": "test"})
@@ -141,7 +167,7 @@ class TestLanceStore:
     """Tests for LanceStore."""
 
     @pytest.fixture
-    def store(self):
+    def store(self) -> Generator[LanceStore, None, None]:
         """Create a temporary LanceStore."""
         tmpdir = tempfile.mkdtemp()
         store = LanceStore(uri=tmpdir)
@@ -149,7 +175,7 @@ class TestLanceStore:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
     @pytest.fixture
-    def sample_chunks(self):
+    def sample_chunks(self) -> list[Chunk]:
         """Create sample chunks with embeddings."""
         return [
             Chunk(
@@ -168,19 +194,19 @@ class TestLanceStore:
             ),
         ]
 
-    def test_add_and_count(self, store, sample_chunks):
+    def test_add_and_count(self, store: LanceStore, sample_chunks: list[Chunk]) -> None:
         """Test adding chunks and counting."""
         assert store.count() == 0
         store.add_chunks(sample_chunks)
         assert store.count() == 2
 
-    def test_add_chunks_without_embeddings_fails(self, store):
+    def test_add_chunks_without_embeddings_fails(self, store: LanceStore) -> None:
         """Test that chunks without embeddings fail."""
         chunks = [Chunk(text="No embedding", source="test.md", chunk_index=0)]
         with pytest.raises(ValueError, match="embeddings"):
             store.add_chunks(chunks)
 
-    def test_search(self, store, sample_chunks):
+    def test_search(self, store: LanceStore, sample_chunks: list[Chunk]) -> None:
         """Test searching for chunks."""
         store.add_chunks(sample_chunks)
 
@@ -196,7 +222,7 @@ class TestLanceStore:
         # First result should be most similar
         assert "Python" in results[0].chunk
 
-    def test_search_with_filters(self, store, sample_chunks):
+    def test_search_with_filters(self, store: LanceStore, sample_chunks: list[Chunk]) -> None:
         """Test searching with metadata filters."""
         store.add_chunks(sample_chunks)
 
@@ -209,7 +235,7 @@ class TestLanceStore:
 
         assert len(results) == 2
 
-    def test_delete_by_source(self, store, sample_chunks):
+    def test_delete_by_source(self, store: LanceStore, sample_chunks: list[Chunk]) -> None:
         """Test deleting chunks by source."""
         store.add_chunks(sample_chunks)
         assert store.count() == 2
@@ -218,7 +244,7 @@ class TestLanceStore:
         assert deleted == 2
         assert store.count() == 0
 
-    def test_clear(self, store, sample_chunks):
+    def test_clear(self, store: LanceStore, sample_chunks: list[Chunk]) -> None:
         """Test clearing all data."""
         store.add_chunks(sample_chunks)
         assert store.count() == 2
@@ -226,7 +252,7 @@ class TestLanceStore:
         store.clear()
         assert store.count() == 0
 
-    def test_get_all_chunk_texts(self, store, sample_chunks):
+    def test_get_all_chunk_texts(self, store: LanceStore, sample_chunks: list[Chunk]) -> None:
         """Test getting all chunk texts."""
         store.add_chunks(sample_chunks)
 
@@ -238,17 +264,22 @@ class TestLanceStore:
 class TestPostgresStore:
     """Tests for PostgresStore (mocked)."""
 
-    def test_requires_dependencies(self):
+    def test_requires_dependencies(self) -> None:
         """Test that PostgresStore requires psycopg2 and pgvector."""
-        # This will fail if deps aren't installed
-        with pytest.raises(ImportError):
-            PostgresStore(connection_string="postgres://test")
+        # Skip if deps are installed - this tests the ImportError path
+        import importlib.util
+
+        if importlib.util.find_spec("psycopg2") and importlib.util.find_spec("pgvector"):
+            pytest.skip("psycopg2 and pgvector are installed, skipping import test")
+        else:
+            with pytest.raises(ImportError):
+                PostgresStore(connection_string="postgres://test")
 
 
 class TestPostgresStoreRetry:
     """Tests for PostgresStore retry logic."""
 
-    def test_retriable_errors_constant(self):
+    def test_retriable_errors_constant(self) -> None:
         """Test that RETRIABLE_ERRORS contains expected error patterns."""
         from piragi.stores.postgres import PostgresStore
 
@@ -258,7 +289,7 @@ class TestPostgresStoreRetry:
         assert "connection already closed" in PostgresStore.RETRIABLE_ERRORS
         assert "connection refused" in PostgresStore.RETRIABLE_ERRORS
 
-    def test_is_retriable_error_method(self):
+    def test_is_retriable_error_method(self) -> None:
         """Test _is_retriable_error method logic."""
         from piragi.stores.postgres import PostgresStore
 
@@ -267,25 +298,21 @@ class TestPostgresStoreRetry:
         store.RETRIABLE_ERRORS = PostgresStore.RETRIABLE_ERRORS
 
         # Test retriable errors
-        assert store._is_retriable_error(
-            Exception("current transaction is aborted, commands ignored")
-        ) is True
-        assert store._is_retriable_error(
-            Exception("server closed the connection unexpectedly")
-        ) is True
-        assert store._is_retriable_error(
-            Exception("connection already closed")
-        ) is True
+        assert (
+            store._is_retriable_error(Exception("current transaction is aborted, commands ignored"))
+            is True
+        )
+        assert (
+            store._is_retriable_error(Exception("server closed the connection unexpectedly"))
+            is True
+        )
+        assert store._is_retriable_error(Exception("connection already closed")) is True
 
         # Test non-retriable errors
-        assert store._is_retriable_error(
-            Exception("syntax error at or near SELECT")
-        ) is False
-        assert store._is_retriable_error(
-            Exception("column 'foo' does not exist")
-        ) is False
+        assert store._is_retriable_error(Exception("syntax error at or near SELECT")) is False
+        assert store._is_retriable_error(Exception("column 'foo' does not exist")) is False
 
-    def test_execute_with_retry_success_first_attempt(self):
+    def test_execute_with_retry_success_first_attempt(self) -> None:
         """Test _execute_with_retry succeeds on first attempt."""
         from piragi.stores.postgres import PostgresStore
 
@@ -296,7 +323,7 @@ class TestPostgresStoreRetry:
 
         call_count = 0
 
-        def successful_operation():
+        def successful_operation() -> str:
             nonlocal call_count
             call_count += 1
             return "success"
@@ -305,7 +332,7 @@ class TestPostgresStoreRetry:
         assert result == "success"
         assert call_count == 1
 
-    def test_execute_with_retry_retries_on_retriable_error(self):
+    def test_execute_with_retry_retries_on_retriable_error(self) -> None:
         """Test _execute_with_retry retries on retriable errors."""
         from piragi.stores.postgres import PostgresStore
 
@@ -313,11 +340,11 @@ class TestPostgresStoreRetry:
         store.RETRIABLE_ERRORS = PostgresStore.RETRIABLE_ERRORS
         store.max_retries = 3
         store.retry_delay = 0.01
-        store._reconnect = MagicMock()
+        object.__setattr__(store, "_reconnect", MagicMock())
 
         call_count = 0
 
-        def fail_then_succeed():
+        def fail_then_succeed() -> str:
             nonlocal call_count
             call_count += 1
             if call_count < 3:
@@ -327,9 +354,10 @@ class TestPostgresStoreRetry:
         result = store._execute_with_retry(fail_then_succeed)
         assert result == "success"
         assert call_count == 3
-        assert store._reconnect.call_count == 2  # Called on each retry
+        reconnect_mock: MagicMock = store._reconnect  # type: ignore[assignment]
+        assert reconnect_mock.call_count == 2  # Called on each retry
 
-    def test_execute_with_retry_raises_non_retriable_immediately(self):
+    def test_execute_with_retry_raises_non_retriable_immediately(self) -> None:
         """Test _execute_with_retry raises non-retriable errors immediately."""
         from piragi.stores.postgres import PostgresStore
 
@@ -340,7 +368,7 @@ class TestPostgresStoreRetry:
 
         call_count = 0
 
-        def non_retriable_error():
+        def non_retriable_error() -> None:
             nonlocal call_count
             call_count += 1
             raise Exception("syntax error")
@@ -350,7 +378,7 @@ class TestPostgresStoreRetry:
 
         assert call_count == 1  # No retries for non-retriable errors
 
-    def test_execute_with_retry_exhausts_retries(self):
+    def test_execute_with_retry_exhausts_retries(self) -> None:
         """Test _execute_with_retry exhausts retries and raises."""
         from piragi.stores.postgres import PostgresStore
 
@@ -358,11 +386,11 @@ class TestPostgresStoreRetry:
         store.RETRIABLE_ERRORS = PostgresStore.RETRIABLE_ERRORS
         store.max_retries = 2
         store.retry_delay = 0.01
-        store._reconnect = MagicMock()
+        object.__setattr__(store, "_reconnect", MagicMock())
 
         call_count = 0
 
-        def always_fail():
+        def always_fail() -> None:
             nonlocal call_count
             call_count += 1
             raise Exception("transaction is aborted")
@@ -376,14 +404,14 @@ class TestPostgresStoreRetry:
 class TestDimensionInference:
     """Tests for automatic dimension inference."""
 
-    def test_get_dimensions_method_exists(self):
+    def test_get_dimensions_method_exists(self) -> None:
         """Test that EmbeddingGenerator has get_dimensions method."""
         from piragi.embeddings import EmbeddingGenerator
 
         # Verify the method exists
         assert hasattr(EmbeddingGenerator, "get_dimensions")
 
-    def test_postgres_store_dimension_inference_logic(self):
+    def test_postgres_store_dimension_inference_logic(self) -> None:
         """Test PostgresStore dimension inference logic without actual connection."""
         from piragi.stores.postgres import PostgresStore
 
@@ -393,7 +421,7 @@ class TestDimensionInference:
 
         # Test the dimension inference logic directly
         # We can't instantiate PostgresStore without psycopg2, but we can test the logic
-        store = object.__new__(PostgresStore)
+        object.__new__(PostgresStore)
 
         # Simulate the dimension logic
         vector_dimension = None
@@ -409,7 +437,7 @@ class TestDimensionInference:
         assert result == 384
         mock_embedder.get_dimensions.assert_called_once()
 
-    def test_postgres_store_explicit_dimension_takes_precedence(self):
+    def test_postgres_store_explicit_dimension_takes_precedence(self) -> None:
         """Test that explicit vector_dimension takes precedence over embedder."""
         mock_embedder = MagicMock()
         mock_embedder.get_dimensions.return_value = 384
@@ -429,7 +457,7 @@ class TestDimensionInference:
         # get_dimensions should NOT be called when explicit dimension provided
         mock_embedder.get_dimensions.assert_not_called()
 
-    def test_postgres_store_default_dimension(self):
+    def test_postgres_store_default_dimension(self) -> None:
         """Test that default dimension is 768 when neither provided."""
         # Simulate the dimension logic with no embedder
         vector_dimension = None
@@ -448,8 +476,19 @@ class TestDimensionInference:
 class TestPineconeStore:
     """Tests for PineconeStore (mocked)."""
 
-    def test_requires_dependencies(self):
-        """Test that PineconeStore requires pinecone-client."""
-        # This will fail if deps aren't installed
-        with pytest.raises(ImportError):
-            PineconeStore(api_key="test", index_name="test")
+    def test_requires_dependencies(self) -> None:
+        """Test that PineconeStore requires pinecone."""
+        # Skip if deps are installed - this tests the ImportError path
+        import importlib.util
+
+        if importlib.util.find_spec("pinecone"):
+            pytest.skip("pinecone is installed, skipping import test")
+        else:
+            try:
+                with pytest.raises(ImportError):
+                    PineconeStore(api_key="test", index_name="test")
+            except Exception as e:
+                # Handle case where old pinecone-client conflicts with new pinecone
+                if "renamed" in str(e).lower():
+                    pytest.skip("pinecone package conflict, skipping import test")
+                raise

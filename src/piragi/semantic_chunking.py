@@ -2,8 +2,9 @@
 
 import logging
 import re
-from typing import List, Optional, Tuple
+from typing import Any
 
+from .chunking import Chunker
 from .types import Chunk, Document
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ class SemanticChunker:
         similarity_threshold: float = 0.5,
         min_chunk_size: int = 100,
         max_chunk_size: int = 2000,
-        device: Optional[str] = None,
+        device: str | None = None,
     ) -> None:
         """
         Initialize semantic chunker.
@@ -42,9 +43,9 @@ class SemanticChunker:
         self.max_chunk_size = max_chunk_size
         self.device = device
 
-        self._model = None
+        self._model: Any = None
 
-    def _load_model(self):
+    def _load_model(self) -> Any:
         """Lazy load embedding model."""
         if self._model is None:
             from sentence_transformers import SentenceTransformer
@@ -55,24 +56,24 @@ class SemanticChunker:
             )
         return self._model
 
-    def _split_sentences(self, text: str) -> List[str]:
+    def _split_sentences(self, text: str) -> list[str]:
         """Split text into sentences."""
         # Handle common sentence boundaries
-        sentence_pattern = r'(?<=[.!?])\s+(?=[A-Z])'
+        sentence_pattern = r"(?<=[.!?])\s+(?=[A-Z])"
         sentences = re.split(sentence_pattern, text)
 
         # Also split on double newlines (paragraphs)
         result = []
         for sent in sentences:
-            parts = sent.split('\n\n')
+            parts = sent.split("\n\n")
             result.extend([p.strip() for p in parts if p.strip()])
 
         return result
 
     def _compute_similarities(
         self,
-        sentences: List[str],
-    ) -> List[float]:
+        sentences: list[str],
+    ) -> list[float]:
         """
         Compute cosine similarity between adjacent sentences.
 
@@ -104,9 +105,9 @@ class SemanticChunker:
 
     def _find_split_points(
         self,
-        sentences: List[str],
-        similarities: List[float],
-    ) -> List[int]:
+        sentences: list[str],
+        similarities: list[float],
+    ) -> list[int]:
         """
         Find indices where chunks should be split.
 
@@ -120,7 +121,7 @@ class SemanticChunker:
         split_points = []
 
         current_chunk_size = 0
-        for i, (sent, sim) in enumerate(zip(sentences[:-1], similarities)):
+        for i, (sent, sim) in enumerate(zip(sentences[:-1], similarities, strict=False)):
             current_chunk_size += len(sent)
 
             # Split if:
@@ -129,15 +130,14 @@ class SemanticChunker:
             # OR
             # 3. Chunk is getting too large
             if (
-                sim < self.similarity_threshold
-                and current_chunk_size >= self.min_chunk_size
+                sim < self.similarity_threshold and current_chunk_size >= self.min_chunk_size
             ) or current_chunk_size >= self.max_chunk_size:
                 split_points.append(i + 1)
                 current_chunk_size = 0
 
         return split_points
 
-    def chunk_document(self, document: Document) -> List[Chunk]:
+    def chunk_document(self, document: Document) -> list[Chunk]:
         """
         Chunk document using semantic analysis.
 
@@ -204,11 +204,11 @@ class ContextualChunker:
 
     def __init__(
         self,
-        base_chunker: Optional["Chunker"] = None,
+        base_chunker: Chunker | None = None,
         model: str = "llama3.2",
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
-        context_template: Optional[str] = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        context_template: str | None = None,
     ) -> None:
         """
         Initialize contextual chunker.
@@ -268,7 +268,7 @@ Write a very brief (1-2 sentence) context that situates this chunk within the ov
 - Key entities or concepts mentioned
 - How it relates to the document's main subject
 
-Context:"""
+Context:"""  # noqa: E501
 
         try:
             response = self.client.chat.completions.create(
@@ -291,7 +291,7 @@ Context:"""
             # Fallback: use document source and metadata
             return f"From {document.source}"
 
-    def chunk_document(self, document: Document) -> List[Chunk]:
+    def chunk_document(self, document: Document) -> list[Chunk]:
         """
         Chunk document with contextual prefixes.
 
@@ -350,8 +350,8 @@ class PropositionChunker:
     def __init__(
         self,
         model: str = "llama3.2",
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
         max_propositions_per_call: int = 20,
     ) -> None:
         """
@@ -377,7 +377,7 @@ class PropositionChunker:
 
         self.client = OpenAI(api_key=api_key, base_url=base_url)
 
-    def _extract_propositions(self, text: str) -> List[str]:
+    def _extract_propositions(self, text: str) -> list[str]:
         """
         Extract atomic propositions from text.
 
@@ -428,7 +428,7 @@ Propositions:"""
             logger.warning(f"Proposition extraction failed: {e}")
             return [text]  # Fallback to original text
 
-    def chunk_document(self, document: Document) -> List[Chunk]:
+    def chunk_document(self, document: Document) -> list[Chunk]:
         """
         Chunk document into propositions.
 
@@ -496,7 +496,7 @@ class HierarchicalChunker:
         self,
         text: str,
         source: str,
-    ) -> List[Tuple[str, int]]:
+    ) -> list[tuple[str, int]]:
         """Create parent-level chunks."""
         parents = []
         start = 0
@@ -528,7 +528,7 @@ class HierarchicalChunker:
         parent_idx: int,
         source: str,
         metadata: dict,
-    ) -> List[Chunk]:
+    ) -> list[Chunk]:
         """Create child chunks from a parent."""
         children = []
         start = 0
@@ -569,7 +569,7 @@ class HierarchicalChunker:
     def chunk_document(
         self,
         document: Document,
-    ) -> Tuple[List[Chunk], List[Chunk]]:
+    ) -> tuple[list[Chunk], list[Chunk]]:
         """
         Chunk document into parent and child chunks.
 

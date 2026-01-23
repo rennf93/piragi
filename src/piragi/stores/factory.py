@@ -1,13 +1,13 @@
 """Factory for creating vector stores from URIs and configs."""
 
-from typing import Any, Dict, Optional, Union
-from urllib.parse import urlparse, parse_qs
+from typing import Any
+from urllib.parse import parse_qs, urlparse
 
-from .protocol import VectorStoreProtocol
 from .lance import LanceStore
+from .protocol import VectorStoreProtocol
 
 
-def parse_store_uri(uri: str) -> Dict[str, Any]:
+def parse_store_uri(uri: str) -> dict[str, Any]:
     """
     Parse a store URI into connection parameters.
 
@@ -24,7 +24,7 @@ def parse_store_uri(uri: str) -> Dict[str, Any]:
         Dict with 'type' and connection parameters
     """
     # Local path (no scheme or file://)
-    if not "://" in uri or uri.startswith("file://"):
+    if "://" not in uri or uri.startswith("file://"):
         path = uri.replace("file://", "")
         return {"type": "lance", "uri": path}
 
@@ -59,10 +59,10 @@ def parse_store_uri(uri: str) -> Dict[str, Any]:
 
 
 def create_store(
-    store: Union[str, Dict[str, Any], VectorStoreProtocol, None] = None,
+    store: str | dict[str, Any] | VectorStoreProtocol | None = None,
     persist_dir: str = ".piragi",
     embedding_model: str = "all-mpnet-base-v2",
-    vector_dimension: Optional[int] = None,
+    vector_dimension: int | None = None,
 ) -> VectorStoreProtocol:
     """
     Create a vector store from various input types.

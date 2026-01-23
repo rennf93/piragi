@@ -3,7 +3,6 @@
 import hashlib
 import threading
 from collections import OrderedDict
-from typing import List, Optional
 
 
 class EmbeddingCache:
@@ -24,7 +23,7 @@ class EmbeddingCache:
     """
 
     def __init__(self, max_size: int = 10000, enabled: bool = True) -> None:
-        self._cache: OrderedDict[str, List[float]] = OrderedDict()
+        self._cache: OrderedDict[str, list[float]] = OrderedDict()
         self._max_size = max_size
         self._enabled = enabled
         self._lock = threading.Lock()
@@ -35,7 +34,7 @@ class EmbeddingCache:
         """Create a hash key for text content."""
         return hashlib.sha256(text.encode()).hexdigest()[:16]
 
-    def get(self, text: str) -> Optional[List[float]]:
+    def get(self, text: str) -> list[float] | None:
         """Get cached embedding for text.
 
         Args:
@@ -57,7 +56,7 @@ class EmbeddingCache:
             self._misses += 1
             return None
 
-    def get_batch(self, texts: List[str]) -> tuple[List[Optional[List[float]]], List[int]]:
+    def get_batch(self, texts: list[str]) -> tuple[list[list[float] | None], list[int]]:
         """Get cached embeddings for multiple texts.
 
         Args:
@@ -66,8 +65,8 @@ class EmbeddingCache:
         Returns:
             Tuple of (list of embeddings or None for misses, list of indices that missed)
         """
-        results: List[Optional[List[float]]] = []
-        missed_indices: List[int] = []
+        results: list[list[float] | None] = []
+        missed_indices: list[int] = []
 
         for i, text in enumerate(texts):
             cached = self.get(text)
@@ -77,7 +76,7 @@ class EmbeddingCache:
 
         return results, missed_indices
 
-    def set(self, text: str, embedding: List[float]) -> None:
+    def set(self, text: str, embedding: list[float]) -> None:
         """Cache embedding for text.
 
         Args:
@@ -97,14 +96,14 @@ class EmbeddingCache:
                 while len(self._cache) > self._max_size:
                     self._cache.popitem(last=False)
 
-    def set_batch(self, texts: List[str], embeddings: List[List[float]]) -> None:
+    def set_batch(self, texts: list[str], embeddings: list[list[float]]) -> None:
         """Cache multiple embeddings at once.
 
         Args:
             texts: List of texts that were embedded
             embeddings: List of embedding vectors to cache
         """
-        for text, embedding in zip(texts, embeddings):
+        for text, embedding in zip(texts, embeddings, strict=True):
             self.set(text, embedding)
 
     def clear(self) -> None:

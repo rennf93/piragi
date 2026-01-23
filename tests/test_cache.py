@@ -1,7 +1,5 @@
 """Tests for the embedding cache layer."""
 
-import threading
-import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest

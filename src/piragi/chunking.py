@@ -1,7 +1,6 @@
 """Smart chunking strategies for documents."""
 
 import re
-from typing import List
 
 import pysbd
 from transformers import AutoTokenizer
@@ -37,7 +36,7 @@ class Chunker:
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
         self._segmenter = pysbd.Segmenter(language="en", clean=False)
 
-    def chunk_document(self, document: Document) -> List[Chunk]:
+    def chunk_document(self, document: Document) -> list[Chunk]:
         """
         Chunk a document into smaller pieces.
 
@@ -64,31 +63,27 @@ class Chunker:
 
         # Filter out short chunks if min_chunk_length is set
         if self.min_chunk_length > 0:
-            chunks = [
-                chunk for chunk in chunks
-                if len(chunk.text.strip()) >= self.min_chunk_length
-            ]
+            chunks = [chunk for chunk in chunks if len(chunk.text.strip()) >= self.min_chunk_length]
             # Re-index chunks after filtering
             for i, chunk in enumerate(chunks):
                 chunk.chunk_index = i
 
         return chunks
 
-    def _split_by_headers(self, text: str) -> List[str]:
+    def _split_by_headers(self, text: str) -> list[str]:
         """Split text by markdown headers while preserving structure."""
         # Pattern to match markdown headers (# Header)
         header_pattern = r"^(#{1,6}\s+.+)$"
 
         lines = text.split("\n")
-        sections = []
-        current_section = []
+        sections: list[str] = []
+        current_section: list[str] = []
 
         for line in lines:
-            if re.match(header_pattern, line.strip()):
-                # Save previous section if it exists
-                if current_section:
-                    sections.append("\n".join(current_section))
-                    current_section = []
+            # Save previous section when we hit a new header
+            if re.match(header_pattern, line.strip()) and current_section:
+                sections.append("\n".join(current_section))
+                current_section = []
 
             # Always add the line to current section (including headers)
             current_section.append(line)
@@ -99,7 +94,7 @@ class Chunker:
 
         return sections if sections else [text]
 
-    def _chunk_text(self, text: str, source: str, start_index: int) -> List[Chunk]:
+    def _chunk_text(self, text: str, source: str, start_index: int) -> list[Chunk]:
         """
         Chunk text into token-sized pieces with overlap.
 
@@ -178,10 +173,10 @@ class Chunker:
         accumulated = ""
 
         for sentence in sentences:
-            accumulated += sentence
+            accumulated += str(sentence)
             # Break after a sentence that ends past the halfway point
             if len(accumulated) >= half_len:
-                return accumulated
+                return str(accumulated)
 
         # If no good break point, return as is
-        return text
+        return str(text)

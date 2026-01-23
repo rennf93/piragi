@@ -14,20 +14,23 @@ Expected behavior with v0.1.3+:
 import sys
 import time
 import traceback
+from typing import Any
 
 
-def get_memory_usage_mb():
+def get_memory_usage_mb() -> Any | None:
     """Get current process memory usage in MB."""
     try:
-        import psutil
         import os
+
+        import psutil
+
         process = psutil.Process(os.getpid())
         return process.memory_info().rss / 1024 / 1024
     except ImportError:
         return None
 
 
-def test_chronon_loading():
+def test_chronon_loading() -> bool:
     """Test loading chronon.ai website."""
     from piragi import Ragi
 
@@ -43,7 +46,7 @@ def test_chronon_loading():
     start = time.time()
 
     try:
-        kb = Ragi('https://chronon.ai', config={'auto_update': {'enabled': False}})
+        kb = Ragi("https://chronon.ai", config={"auto_update": {"enabled": False}})
         elapsed = time.time() - start
 
         mem_after_load = get_memory_usage_mb()
@@ -58,7 +61,7 @@ def test_chronon_loading():
 
             if mem_increase > 2000:
                 print(f"   ⚠ WARNING: Memory increase too high ({mem_increase:.0f} MB)")
-                print(f"   ⚠ Expected ~500-800 MB with all-mpnet-base-v2 model")
+                print("   ⚠ Expected ~500-800 MB with all-mpnet-base-v2 model")
                 return False
 
     except Exception as e:
@@ -77,18 +80,18 @@ def test_chronon_loading():
     for query in test_queries:
         try:
             answer = kb.ask(query)
-            preview = answer.text[:100].replace('\n', ' ')
+            preview = answer.text[:100].replace("\n", " ")
             print(f"   ✓ Query: '{query}'")
             print(f"     Answer: {preview}...")
             print(f"     Citations: {len(answer.citations)}")
 
             # Basic sanity checks
             if len(answer.text) < 20:
-                print(f"   ⚠ WARNING: Answer is suspiciously short")
+                print("   ⚠ WARNING: Answer is suspiciously short")
                 print(f"     Full answer: {answer.text}")
 
             if len(answer.citations) == 0:
-                print(f"   ⚠ WARNING: No citations provided")
+                print("   ⚠ WARNING: No citations provided")
 
         except Exception as e:
             print(f"   ✗ Query failed: '{query}'")
@@ -107,7 +110,7 @@ def test_chronon_loading():
     return True
 
 
-def test_embedding_model():
+def test_embedding_model() -> bool:
     """Verify the correct embedding model is being used."""
     from piragi import Ragi
 
@@ -115,7 +118,7 @@ def test_embedding_model():
     print("TEST: Verify embedding model configuration")
     print("=" * 70)
 
-    kb = Ragi(config={'auto_update': {'enabled': False}})
+    kb = Ragi(config={"auto_update": {"enabled": False}})
 
     # Check the model name
     model_name = kb.embedder.model_name
@@ -152,7 +155,7 @@ if __name__ == "__main__":
         print("\n\n⚠ Test interrupted by user")
         sys.exit(130)
     except Exception as e:
-        print(f"\n\n✗✗✗ UNEXPECTED ERROR ✗✗✗")
+        print("\n\n✗✗✗ UNEXPECTED ERROR ✗✗✗")
         print(f"Error: {e}")
         traceback.print_exc()
         sys.exit(1)

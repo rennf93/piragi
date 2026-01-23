@@ -30,29 +30,29 @@ Example:
     ... })
 """
 
-from .core import Ragi
 from .async_ragi import AsyncRagi
-from .types import Answer, Citation
 from .cache import EmbeddingCache
+from .core import Ragi
 from .embeddings import EmbeddingGenerator
-from .retry import retry_sync, retry_async, RetryConfig, is_retriable
+from .hybrid_search import BM25, HybridSearcher
+from .query_transform import HyDE, MultiQueryRetriever, QueryExpander, StepBackPrompting
 
 # Advanced components (optional imports)
-from .reranker import CrossEncoderReranker, TFIDFReranker, HybridReranker
-from .hybrid_search import BM25, HybridSearcher
-from .query_transform import HyDE, QueryExpander, MultiQueryRetriever, StepBackPrompting
+from .reranker import CrossEncoderReranker, HybridReranker, TFIDFReranker
+from .retry import RetryConfig, is_retriable, retry_async, retry_sync
 from .semantic_chunking import (
-    SemanticChunker,
     ContextualChunker,
-    PropositionChunker,
     HierarchicalChunker,
+    PropositionChunker,
+    SemanticChunker,
 )
 from .stores import (
-    VectorStoreProtocol,
     LanceStore,
-    PostgresStore,
     PineconeStore,
+    PostgresStore,
+    VectorStoreProtocol,
 )
+from .types import Answer, Citation
 
 __version__ = "0.3.0"
 __all__ = [

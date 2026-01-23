@@ -3,7 +3,7 @@
 import hashlib
 import os
 import time
-from typing import Dict, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 import requests
@@ -32,9 +32,7 @@ class ChangeDetector:
         return parsed.scheme in ("http", "https")
 
     @staticmethod
-    def check_file_changed(
-        source: str, stored_mtime: Optional[float], stored_hash: str
-    ) -> bool:
+    def check_file_changed(source: str, stored_mtime: float | None, stored_hash: str) -> bool:
         """
         Check if a file has changed using mtime and content hash.
 
@@ -57,7 +55,7 @@ class ChangeDetector:
 
         # Modification time changed, check actual content
         try:
-            with open(source, "r", encoding="utf-8", errors="ignore") as f:
+            with open(source, encoding="utf-8", errors="ignore") as f:
                 content = f.read()
             current_hash = ChangeDetector.compute_content_hash(content)
             return current_hash != stored_hash
@@ -68,10 +66,10 @@ class ChangeDetector:
     @staticmethod
     def check_url_changed(
         source: str,
-        stored_etag: Optional[str],
-        stored_last_modified: Optional[str],
+        stored_etag: str | None,
+        stored_last_modified: str | None,
         timeout: int = 10,
-    ) -> Dict[str, any]:
+    ) -> dict[str, Any]:
         """
         Check if a URL has changed using HTTP headers.
         Uses conditional requests for minimal latency.
@@ -136,7 +134,7 @@ class ChangeDetector:
             return {"changed": False, "error": str(e)}
 
     @staticmethod
-    def get_file_metadata(source: str, content: str) -> Dict[str, any]:
+    def get_file_metadata(source: str, content: str) -> dict[str, Any]:
         """
         Get metadata for a file source.
 
@@ -161,9 +159,7 @@ class ChangeDetector:
         }
 
     @staticmethod
-    def get_url_metadata(
-        source: str, content: str, timeout: int = 10
-    ) -> Dict[str, any]:
+    def get_url_metadata(source: str, content: str, timeout: int = 10) -> dict[str, Any]:
         """
         Get metadata for a URL source.
 

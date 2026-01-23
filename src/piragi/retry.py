@@ -3,15 +3,16 @@
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, Tuple, TypeVar
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
 # Default retriable error patterns
-DEFAULT_RETRIABLE_PATTERNS: Tuple[str, ...] = (
+DEFAULT_RETRIABLE_PATTERNS: tuple[str, ...] = (
     "connection reset",
     "connection refused",
     "connection closed",
@@ -34,9 +35,7 @@ DEFAULT_RETRIABLE_PATTERNS: Tuple[str, ...] = (
 )
 
 
-def is_retriable(
-    error: Exception, patterns: Tuple[str, ...] = DEFAULT_RETRIABLE_PATTERNS
-) -> bool:
+def is_retriable(error: Exception, patterns: tuple[str, ...] = DEFAULT_RETRIABLE_PATTERNS) -> bool:
     """Check if an error is retriable based on error message patterns.
 
     Args:
@@ -54,17 +53,14 @@ def is_retriable(
         return True
 
     # Check error type name
-    if any(p in error_type for p in patterns):
-        return True
-
-    return False
+    return bool(any(p in error_type for p in patterns))
 
 
 def retry_sync(
     max_retries: int = 3,
     base_delay: float = 0.5,
     max_delay: float = 30.0,
-    retriable_patterns: Tuple[str, ...] = DEFAULT_RETRIABLE_PATTERNS,
+    retriable_patterns: tuple[str, ...] = DEFAULT_RETRIABLE_PATTERNS,
     on_retry: Callable[[Exception, int], None] | None = None,
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """Decorator for synchronous retry with exponential backoff.
@@ -119,9 +115,9 @@ def retry_async(
     max_retries: int = 3,
     base_delay: float = 0.5,
     max_delay: float = 30.0,
-    retriable_patterns: Tuple[str, ...] = DEFAULT_RETRIABLE_PATTERNS,
+    retriable_patterns: tuple[str, ...] = DEFAULT_RETRIABLE_PATTERNS,
     on_retry: Callable[[Exception, int], None] | None = None,
-) -> Callable[[Callable[..., T]], Callable[..., T]]:
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator for async retry with exponential backoff.
 
     Args:
@@ -141,9 +137,9 @@ def retry_async(
         ...     return await api.get("/data")
     """
 
-    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> T:
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
             last_exception: Exception | None = None
             for attempt in range(max_retries + 1):
                 try:
@@ -186,7 +182,7 @@ class RetryConfig:
         max_retries: int = 3,
         base_delay: float = 0.5,
         max_delay: float = 30.0,
-        retriable_patterns: Tuple[str, ...] = DEFAULT_RETRIABLE_PATTERNS,
+        retriable_patterns: tuple[str, ...] = DEFAULT_RETRIABLE_PATTERNS,
     ) -> None:
         """Initialize retry configuration.
 
