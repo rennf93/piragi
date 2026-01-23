@@ -297,7 +297,7 @@ class SupabaseStore:
 
     def count(self) -> int:
         """Return the number of chunks in the store."""
-        from postgrest.types import CountMethod
+        from postgrest.types import CountMethod  # type: ignore[import-not-found]
 
         result = self.client.table(self.table_name).select("id", count=CountMethod.exact).execute()
         return result.count or 0
