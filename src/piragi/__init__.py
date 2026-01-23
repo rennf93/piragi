@@ -33,6 +33,9 @@ Example:
 from .core import Ragi
 from .async_ragi import AsyncRagi
 from .types import Answer, Citation
+from .cache import EmbeddingCache
+from .embeddings import EmbeddingGenerator
+from .retry import retry_sync, retry_async, RetryConfig, is_retriable
 
 # Advanced components (optional imports)
 from .reranker import CrossEncoderReranker, TFIDFReranker, HybridReranker
@@ -58,6 +61,14 @@ __all__ = [
     "AsyncRagi",
     "Answer",
     "Citation",
+    # Embeddings
+    "EmbeddingGenerator",
+    "EmbeddingCache",
+    # Retry utilities
+    "retry_sync",
+    "retry_async",
+    "RetryConfig",
+    "is_retriable",
     # Vector stores
     "VectorStoreProtocol",
     "LanceStore",

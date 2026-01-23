@@ -1,9 +1,12 @@
 """Embedding generation using local or remote models."""
 
 import os
-from typing import Callable, List, Optional
+from typing import TYPE_CHECKING, Callable, List, Optional
 
 from .types import Chunk
+
+if TYPE_CHECKING:
+    from .cache import EmbeddingCache
 
 
 class EmbeddingGenerator:
@@ -15,7 +18,10 @@ class EmbeddingGenerator:
         device: str | None = None,
         base_url: str | None = None,
         api_key: str | None = None,
-        batch_size: int = 32
+        batch_size: int = 32,
+        cache: Optional["EmbeddingCache"] = None,
+        cache_enabled: bool = False,
+        cache_max_size: int = 10000,
     ) -> None:
         """
         Initialize the embedding generator.
@@ -25,12 +31,26 @@ class EmbeddingGenerator:
             device: Device to run on ('cuda', 'cpu', or None for auto-detect) - only for local models
             base_url: Optional API base URL for remote embeddings (e.g., https://api.openai.com/v1)
             api_key: Optional API key for remote embeddings
+            batch_size: Number of texts to embed in a single batch (default: 32)
+            cache: Optional pre-configured EmbeddingCache instance to use
+            cache_enabled: Whether to enable embedding caching (default: False)
+            cache_max_size: Maximum number of embeddings to cache (default: 10000)
         """
         self.model_name = model
         self.base_url = base_url
         self.api_key = api_key
         self.use_remote = base_url is not None
         self.batch_size = batch_size
+
+        # Initialize cache
+        if cache is not None:
+            self._cache = cache
+        elif cache_enabled:
+            from .cache import EmbeddingCache
+
+            self._cache = EmbeddingCache(max_size=cache_max_size)
+        else:
+            self._cache = None
                     
         if self.use_remote:
             # Use OpenAI-compatible API client
@@ -144,6 +164,22 @@ class EmbeddingGenerator:
         test_embedding = self.embed_query("dimension test")
         return len(test_embedding)
 
+    @property
+    def cache(self) -> Optional["EmbeddingCache"]:
+        """Return the cache instance if caching is enabled."""
+        return self._cache
+
+    @property
+    def cache_stats(self) -> Optional[dict]:
+        """Return cache statistics if caching is enabled.
+
+        Returns:
+            Dictionary with cache statistics or None if caching is disabled
+        """
+        if self._cache is not None:
+            return self._cache.stats
+        return None
+
     def embed_query(self, query: str, task_instruction: str | None = None) -> List[float]:
         """
         Generate embedding for a single query.
@@ -156,7 +192,17 @@ class EmbeddingGenerator:
         Returns:
             Embedding vector
         """
+        # Build cache key (include instruction if present)
+        cache_key = f"{task_instruction}:{query}" if task_instruction else query
+
+        # Check cache first
+        if self._cache is not None:
+            cached = self._cache.get(cache_key)
+            if cached is not None:
+                return cached
+
         try:
+            embedding: List[float]
             if self.use_remote:
                 # Use OpenAI-compatible API
                 query_text = query
@@ -167,26 +213,33 @@ class EmbeddingGenerator:
                     input=query_text,
                     model=self.model_name,
                 )
-                return response.data[0].embedding
+                embedding = response.data[0].embedding
             else:
                 # Use local sentence-transformers
                 # Use encode_query for search queries if available
                 if hasattr(self.model, "encode_query"):
                     if task_instruction:
                         query_with_instruction = f"{task_instruction}\n{query}"
-                        embedding = self.model.encode_query(query_with_instruction)
+                        raw_embedding = self.model.encode_query(query_with_instruction)
                     else:
-                        embedding = self.model.encode_query(query)
+                        raw_embedding = self.model.encode_query(query)
                 else:
                     query_text = query
                     if task_instruction:
                         query_text = f"{task_instruction}\n{query}"
-                    embedding = self.model.encode(query_text)
+                    raw_embedding = self.model.encode(query_text)
 
                 # Handle both numpy arrays and lists
-                if hasattr(embedding, 'tolist'):
-                    return embedding.tolist()
-                return embedding
+                if hasattr(raw_embedding, "tolist"):
+                    embedding = raw_embedding.tolist()
+                else:
+                    embedding = raw_embedding
+
+            # Cache the result
+            if self._cache is not None:
+                self._cache.set(cache_key, embedding)
+
+            return embedding
 
         except Exception as e:
             raise RuntimeError(f"Failed to generate query embedding: {e}")
