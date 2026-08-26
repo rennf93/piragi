@@ -5,8 +5,8 @@ import glob
 import os
 import tempfile
 from pathlib import Path
-from typing import List, Optional, Union
-from urllib.parse import urlparse, urljoin
+from typing import Any
+from urllib.parse import urljoin, urlparse
 
 from markitdown import MarkItDown
 
@@ -22,33 +22,35 @@ _fsspec = None
 _crawl4ai = None
 
 
-def _get_fsspec():
+def _get_fsspec() -> Any:
     """Lazy load fsspec, raising helpful error if not installed."""
     global _fsspec
     if _fsspec is None:
         try:
             import fsspec
+
             _fsspec = fsspec
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "fsspec is required for remote filesystem support. "
                 "Install it with: pip install piragi[remote] or pip install fsspec"
-            )
+            ) from e
     return _fsspec
 
 
-def _get_crawl4ai():
+def _get_crawl4ai() -> Any:
     """Lazy load crawl4ai, raising helpful error if not installed."""
     global _crawl4ai
     if _crawl4ai is None:
         try:
             import crawl4ai
+
             _crawl4ai = crawl4ai
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "crawl4ai is required for recursive URL crawling. "
                 "Install it with: pip install piragi[crawler] or pip install crawl4ai"
-            )
+            ) from e
     return _crawl4ai
 
 
@@ -59,7 +61,7 @@ class DocumentLoader:
         """Initialize the document loader."""
         self.converter = MarkItDown()
 
-    def load(self, source: Union[str, List[str]]) -> List[Document]:
+    def load(self, source: str | list[str]) -> list[Document]:
         """
         Load documents from file paths, URLs, or glob patterns.
 
@@ -69,10 +71,7 @@ class DocumentLoader:
         Returns:
             List of loaded documents
         """
-        if isinstance(source, str):
-            sources = [source]
-        else:
-            sources = source
+        sources = [source] if isinstance(source, str) else source
 
         documents = []
         for src in sources:
@@ -80,7 +79,7 @@ class DocumentLoader:
 
         return documents
 
-    def _load_single(self, source: str) -> List[Document]:
+    def _load_single(self, source: str) -> list[Document]:
         """Load from a single source (file, URL, glob pattern, or remote URI)."""
         # Check if it's a remote filesystem URI (s3://, gs://, az://, etc.)
         if self._is_remote_uri(source):
@@ -148,7 +147,7 @@ class DocumentLoader:
             return Document(content=content, source=file_path, metadata=metadata)
 
         except Exception as e:
-            raise RuntimeError(f"Failed to load file {file_path}: {e}")
+            raise RuntimeError(f"Failed to load file {file_path}: {e}") from e
 
     def _load_url(self, url: str) -> Document:
         """Load content from a URL."""
@@ -165,9 +164,9 @@ class DocumentLoader:
             return Document(content=content, source=url, metadata=metadata)
 
         except Exception as e:
-            raise RuntimeError(f"Failed to load URL {url}: {e}")
+            raise RuntimeError(f"Failed to load URL {url}: {e}") from e
 
-    def _load_glob(self, pattern: str) -> List[Document]:
+    def _load_glob(self, pattern: str) -> list[Document]:
         """Load files matching a glob pattern."""
         files = glob.glob(pattern, recursive=True)
         files = [f for f in files if os.path.isfile(f)]
@@ -177,7 +176,7 @@ class DocumentLoader:
 
         return [self._load_file(f) for f in files]
 
-    def _load_directory(self, directory: str) -> List[Document]:
+    def _load_directory(self, directory: str) -> list[Document]:
         """Load all files from a directory recursively."""
         pattern = os.path.join(directory, "**", "*")
         files = glob.glob(pattern, recursive=True)
@@ -196,7 +195,7 @@ class DocumentLoader:
 
         return documents
 
-    def _load_remote(self, uri: str) -> List[Document]:
+    def _load_remote(self, uri: str) -> list[Document]:
         """
         Load files from remote filesystems (S3, GCS, Azure, etc.) using fsspec.
 
@@ -267,7 +266,7 @@ class DocumentLoader:
 
         return documents
 
-    def _load_remote_file(self, fs, scheme: str, remote_path: str) -> Document:
+    def _load_remote_file(self, fs: Any, scheme: str, remote_path: str) -> Document:
         """Load a single file from a remote filesystem."""
         # Download to temp file for markitdown processing
         filename = os.path.basename(remote_path)
@@ -304,7 +303,7 @@ class DocumentLoader:
         source: str,
         max_depth: int = 3,
         max_pages: int = 100,
-    ) -> List[Document]:
+    ) -> list[Document]:
         """
         Recursively crawl a website and load all pages.
 
@@ -319,7 +318,7 @@ class DocumentLoader:
             List of Document objects for each crawled page
         """
         # Get crawl4ai (lazy import)
-        crawl4ai = _get_crawl4ai()
+        _get_crawl4ai()
         from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 
         # Remove /** suffix to get base URL
@@ -329,10 +328,10 @@ class DocumentLoader:
 
         # Track visited URLs and documents
         visited: set = set()
-        documents: List[Document] = []
-        to_visit: List[tuple] = [(base_url, 0)]  # (url, depth)
+        documents: list[Document] = []
+        to_visit: list[tuple] = [(base_url, 0)]  # (url, depth)
 
-        async def crawl_page(crawler: AsyncWebCrawler, url: str) -> Optional[tuple]:
+        async def crawl_page(crawler: AsyncWebCrawler, url: str) -> tuple | None:
             """Crawl a single page and return (content, links)."""
             try:
                 config = CrawlerRunConfig()
@@ -343,7 +342,7 @@ class DocumentLoader:
             except Exception:
                 return None
 
-        async def run_crawler():
+        async def run_crawler() -> None:
             """Run the async crawler."""
             nonlocal documents, visited, to_visit
 
@@ -377,11 +376,13 @@ class DocumentLoader:
                         "crawl_depth": depth,
                         "crawl_source": base_url,
                     }
-                    documents.append(Document(
-                        content=content,
-                        source=url,
-                        metadata=metadata,
-                    ))
+                    documents.append(
+                        Document(
+                            content=content,
+                            source=url,
+                            metadata=metadata,
+                        )
+                    )
 
                     # Add internal links to queue (same domain only)
                     if depth < max_depth:

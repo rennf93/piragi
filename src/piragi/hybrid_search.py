@@ -3,7 +3,6 @@
 import logging
 import math
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Tuple
 
 from .types import Citation
 
@@ -39,20 +38,21 @@ class BM25:
         # Corpus statistics
         self._corpus_size = 0
         self._avgdl = 0.0
-        self._doc_freqs: Dict[str, int] = defaultdict(int)
-        self._idf: Dict[str, float] = {}
-        self._doc_lens: List[int] = []
-        self._tokenized_corpus: List[List[str]] = []
+        self._doc_freqs: dict[str, int] = defaultdict(int)
+        self._idf: dict[str, float] = {}
+        self._doc_lens: list[int] = []
+        self._tokenized_corpus: list[list[str]] = []
 
-    def _tokenize(self, text: str) -> List[str]:
+    def _tokenize(self, text: str) -> list[str]:
         """Simple tokenization with lowercasing and basic cleanup."""
         import re
+
         # Remove punctuation and split
-        tokens = re.findall(r'\b\w+\b', text.lower())
+        tokens = re.findall(r"\b\w+\b", text.lower())
         # Filter very short tokens
         return [t for t in tokens if len(t) > 1]
 
-    def fit(self, corpus: List[str]) -> "BM25":
+    def fit(self, corpus: list[str]) -> "BM25":
         """
         Fit BM25 on a corpus of documents.
 
@@ -90,7 +90,7 @@ class BM25:
 
         return self
 
-    def score(self, query: str) -> List[float]:
+    def score(self, query: str) -> list[float]:
         """
         Score all documents against a query.
 
@@ -111,7 +111,7 @@ class BM25:
             doc_len = self._doc_lens[idx]
 
             # Count term frequencies in document
-            doc_tf = defaultdict(int)
+            doc_tf: dict[str, int] = defaultdict(int)
             for token in doc_tokens:
                 doc_tf[token] += 1
 
@@ -136,7 +136,7 @@ class BM25:
         self,
         query: str,
         k: int = 10,
-    ) -> List[Tuple[int, float]]:
+    ) -> list[tuple[int, float]]:
         """
         Get top-k document indices and scores.
 
@@ -187,11 +187,11 @@ class HybridSearcher:
         self.use_rrf = use_rrf
         self.rrf_k = rrf_k
 
-        self._bm25: Optional[BM25] = None
-        self._chunk_texts: List[str] = []
-        self._chunk_to_idx: Dict[str, int] = {}
+        self._bm25: BM25 | None = None
+        self._chunk_texts: list[str] = []
+        self._chunk_to_idx: dict[str, int] = {}
 
-    def index_chunks(self, chunks: List[str]) -> None:
+    def index_chunks(self, chunks: list[str]) -> None:
         """
         Index chunks for BM25 search.
 
@@ -207,9 +207,9 @@ class HybridSearcher:
     def search(
         self,
         query: str,
-        vector_citations: List[Citation],
+        vector_citations: list[Citation],
         top_k: int = 10,
-    ) -> List[Citation]:
+    ) -> list[Citation]:
         """
         Perform hybrid search combining vector results with BM25.
 
@@ -233,8 +233,8 @@ class HybridSearcher:
         bm25_scores = self._bm25.score(query)
 
         # Create mapping of chunk text to vector citation
-        vector_scores: Dict[str, float] = {}
-        citation_map: Dict[str, Citation] = {}
+        vector_scores: dict[str, float] = {}
+        citation_map: dict[str, Citation] = {}
 
         for citation in vector_citations:
             key = citation.chunk[:200]
@@ -280,10 +280,10 @@ class HybridSearcher:
 
     def _rrf_fusion(
         self,
-        vector_citations: List[Citation],
-        bm25_scores: List[float],
-        citation_map: Dict[str, Citation],
-    ) -> Dict[str, float]:
+        vector_citations: list[Citation],
+        bm25_scores: list[float],
+        citation_map: dict[str, Citation],
+    ) -> dict[str, float]:
         """
         Combine results using Reciprocal Rank Fusion.
 
@@ -297,7 +297,7 @@ class HybridSearcher:
         Returns:
             Dict of chunk key to RRF score
         """
-        rrf_scores: Dict[str, float] = defaultdict(float)
+        rrf_scores: dict[str, float] = defaultdict(float)
 
         # Vector ranks
         for rank, citation in enumerate(vector_citations, 1):
@@ -308,7 +308,7 @@ class HybridSearcher:
         indexed_bm25 = [(i, s) for i, s in enumerate(bm25_scores)]
         indexed_bm25.sort(key=lambda x: x[1], reverse=True)
 
-        for rank, (idx, score) in enumerate(indexed_bm25, 1):
+        for rank, (idx, _score) in enumerate(indexed_bm25, 1):
             if idx < len(self._chunk_texts):
                 key = self._chunk_texts[idx][:200]
                 if key in citation_map:  # Only include if in vector results
@@ -318,10 +318,10 @@ class HybridSearcher:
 
     def _weighted_fusion(
         self,
-        vector_citations: List[Citation],
-        bm25_scores: List[float],
-        citation_map: Dict[str, Citation],
-    ) -> Dict[str, float]:
+        vector_citations: list[Citation],
+        bm25_scores: list[float],
+        citation_map: dict[str, Citation],
+    ) -> dict[str, float]:
         """
         Combine results using weighted score fusion.
 
@@ -333,7 +333,7 @@ class HybridSearcher:
         Returns:
             Dict of chunk key to combined score
         """
-        combined: Dict[str, float] = {}
+        combined: dict[str, float] = {}
 
         # Normalize BM25 scores to 0-1
         if bm25_scores:

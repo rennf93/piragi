@@ -2,6 +2,7 @@
 
 import os
 import tempfile
+
 from piragi import Ragi
 
 
@@ -98,9 +99,7 @@ def main():
 
         # Load the codebase
         print("Loading codebase into Ragi...")
-        kb = Ragi(tmpdir, config={
-            "embedding": {"model": "sentence-transformers/all-MiniLM-L6-v2"}
-        })
+        kb = Ragi(tmpdir, config={"embedding": {"model": "sentence-transformers/all-MiniLM-L6-v2"}})
 
         print(f"Loaded {kb.count()} chunks from codebase\n")
 

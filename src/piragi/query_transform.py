@@ -1,7 +1,6 @@
 """Query transformation techniques for improved retrieval."""
 
 import logging
-from typing import List, Optional
 
 from openai import OpenAI
 
@@ -23,8 +22,8 @@ class HyDE:
     def __init__(
         self,
         model: str = "llama3.2",
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
         num_hypothetical: int = 1,
         temperature: float = 0.7,
         max_tokens: int = 256,
@@ -71,7 +70,7 @@ Question: {query}
 
 Write the passage as if it's from an authoritative source document. Include specific details, facts, and technical information that would help answer the question. Do not include phrases like "This document explains" - just write the content directly.
 
-Passage:"""
+Passage:"""  # noqa: E501
 
         try:
             response = self.client.chat.completions.create(
@@ -79,7 +78,7 @@ Passage:"""
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a technical writer creating documentation passages. Write factual, detailed content.",
+                        "content": "You are a technical writer creating documentation passages. Write factual, detailed content.",  # noqa: E501
                     },
                     {"role": "user", "content": prompt},
                 ],
@@ -93,7 +92,7 @@ Passage:"""
             logger.warning(f"HyDE generation failed: {e}, using original query")
             return query
 
-    def generate_multiple(self, query: str) -> List[str]:
+    def generate_multiple(self, query: str) -> list[str]:
         """
         Generate multiple hypothetical documents for the query.
 
@@ -139,8 +138,8 @@ class QueryExpander:
     def __init__(
         self,
         model: str = "llama3.2",
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
         num_expansions: int = 2,
     ) -> None:
         """
@@ -164,7 +163,7 @@ class QueryExpander:
 
         self.client = OpenAI(api_key=api_key, base_url=base_url)
 
-    def expand(self, query: str) -> List[str]:
+    def expand(self, query: str) -> list[str]:
         """
         Expand query into multiple variations.
 
@@ -177,7 +176,7 @@ class QueryExpander:
         prompt = f"""Given this question: "{query}"
 
 Generate {self.num_expansions} alternative phrasings that preserve the same meaning but use different words or structure.
-Return only the alternatives, one per line, without numbering or explanation."""
+Return only the alternatives, one per line, without numbering or explanation."""  # noqa: E501
 
         try:
             response = self.client.chat.completions.create(
@@ -221,8 +220,8 @@ class MultiQueryRetriever:
     def __init__(
         self,
         model: str = "llama3.2",
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
         use_hyde: bool = True,
         use_expansion: bool = True,
         num_expansions: int = 2,
@@ -240,11 +239,11 @@ class MultiQueryRetriever:
         """
         self.use_hyde = use_hyde
         self.use_expansion = use_expansion
+        self.hyde: HyDE | None = None
+        self.expander: QueryExpander | None = None
 
         if use_hyde:
             self.hyde = HyDE(model=model, api_key=api_key, base_url=base_url)
-        else:
-            self.hyde = None
 
         if use_expansion:
             self.expander = QueryExpander(
@@ -253,10 +252,8 @@ class MultiQueryRetriever:
                 base_url=base_url,
                 num_expansions=num_expansions,
             )
-        else:
-            self.expander = None
 
-    def get_queries(self, query: str) -> List[str]:
+    def get_queries(self, query: str) -> list[str]:
         """
         Get all query variations for retrieval.
 
@@ -302,8 +299,8 @@ class StepBackPrompting:
     def __init__(
         self,
         model: str = "llama3.2",
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
     ) -> None:
         """Initialize step-back prompting."""
         import os
@@ -340,7 +337,7 @@ For example:
 
 Now generate a general question for the given specific question. Return only the general question, nothing else.
 
-General question:"""
+General question:"""  # noqa: E501
 
         try:
             response = self.client.chat.completions.create(
@@ -362,7 +359,7 @@ General question:"""
             logger.warning(f"Step-back generation failed: {e}")
             return query
 
-    def get_queries(self, query: str) -> List[str]:
+    def get_queries(self, query: str) -> list[str]:
         """
         Get both original and step-back queries.
 

@@ -3,20 +3,27 @@
 import asyncio
 import os
 import sys
-from unittest.mock import MagicMock, patch, AsyncMock
+from collections.abc import Callable, Generator
+from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
+
+# Note: Generator is used for the fixture return type annotation
+_ = Generator  # Silence unused import warning
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 
 @pytest.fixture
-def mock_ragi():
+def mock_ragi() -> Generator[tuple[MagicMock, MagicMock], None, None]:
     """Mock the sync Ragi class."""
     with patch("piragi.async_ragi.Ragi") as mock:
         mock_instance = MagicMock()
 
-        def mock_add(sources, on_progress=None):
+        def mock_add(
+            sources: str | list[str], on_progress: Callable[[str], None] | None = None
+        ) -> MagicMock:
             if on_progress:
                 on_progress("Discovering files...")
                 on_progress("Found 2 documents")
@@ -38,17 +45,19 @@ def mock_ragi():
         mock_instance.clear.return_value = None
         mock_instance.graph = MagicMock()
         mock.return_value = mock_instance
-        yield mock, mock_instance
+        yield (mock, mock_instance)
 
 
 @pytest.mark.asyncio
-async def test_async_ragi_init(mock_ragi):
+async def test_async_ragi_init(
+    mock_ragi: tuple[MagicMock, MagicMock],
+) -> None:
     """Test AsyncRagi initialization."""
     mock_class, mock_instance = mock_ragi
 
     from piragi.async_ragi import AsyncRagi
 
-    kb = AsyncRagi("./docs", persist_dir=".test", graph=True)
+    AsyncRagi("./docs", persist_dir=".test", graph=True)
 
     mock_class.assert_called_once_with(
         sources="./docs",
@@ -61,7 +70,9 @@ async def test_async_ragi_init(mock_ragi):
 
 
 @pytest.mark.asyncio
-async def test_async_ragi_init_with_embedder(mock_ragi):
+async def test_async_ragi_init_with_embedder(
+    mock_ragi: tuple[MagicMock, MagicMock],
+) -> None:
     """Test AsyncRagi initialization with custom embedder."""
     mock_class, mock_instance = mock_ragi
 
@@ -70,7 +81,7 @@ async def test_async_ragi_init_with_embedder(mock_ragi):
     mock_embedder = MagicMock()
     mock_embedder.model_name = "custom-model"
 
-    kb = AsyncRagi("./docs", embedder=mock_embedder)
+    AsyncRagi("./docs", embedder=mock_embedder)
 
     mock_class.assert_called_once_with(
         sources="./docs",
@@ -83,7 +94,9 @@ async def test_async_ragi_init_with_embedder(mock_ragi):
 
 
 @pytest.mark.asyncio
-async def test_async_ragi_shared_embedder(mock_ragi):
+async def test_async_ragi_shared_embedder(
+    mock_ragi: tuple[MagicMock, MagicMock],
+) -> None:
     """Test that embedder can be shared across multiple AsyncRagi instances."""
     mock_class, mock_instance = mock_ragi
 
@@ -91,8 +104,8 @@ async def test_async_ragi_shared_embedder(mock_ragi):
 
     mock_embedder = MagicMock()
 
-    kb1 = AsyncRagi("./docs1", embedder=mock_embedder)
-    kb2 = AsyncRagi("./docs2", embedder=mock_embedder)
+    AsyncRagi("./docs1", embedder=mock_embedder)
+    AsyncRagi("./docs2", embedder=mock_embedder)
 
     # Both should have passed the same embedder
     calls = mock_class.call_args_list
@@ -102,7 +115,9 @@ async def test_async_ragi_shared_embedder(mock_ragi):
 
 
 @pytest.mark.asyncio
-async def test_async_ragi_add(mock_ragi):
+async def test_async_ragi_add(
+    mock_ragi: tuple[MagicMock, MagicMock],
+) -> None:
     """Test async add method."""
     mock_class, mock_instance = mock_ragi
 
@@ -116,7 +131,9 @@ async def test_async_ragi_add(mock_ragi):
 
 
 @pytest.mark.asyncio
-async def test_async_ragi_ask(mock_ragi):
+async def test_async_ragi_ask(
+    mock_ragi: tuple[MagicMock, MagicMock],
+) -> None:
     """Test async ask method."""
     mock_class, mock_instance = mock_ragi
 
@@ -130,7 +147,9 @@ async def test_async_ragi_ask(mock_ragi):
 
 
 @pytest.mark.asyncio
-async def test_async_ragi_ask_with_system_prompt(mock_ragi):
+async def test_async_ragi_ask_with_system_prompt(
+    mock_ragi: tuple[MagicMock, MagicMock],
+) -> None:
     """Test async ask with custom system prompt."""
     mock_class, mock_instance = mock_ragi
 
@@ -143,7 +162,9 @@ async def test_async_ragi_ask_with_system_prompt(mock_ragi):
 
 
 @pytest.mark.asyncio
-async def test_async_ragi_retrieve(mock_ragi):
+async def test_async_ragi_retrieve(
+    mock_ragi: tuple[MagicMock, MagicMock],
+) -> None:
     """Test async retrieve method."""
     mock_class, mock_instance = mock_ragi
     mock_instance.retrieve.return_value = [MagicMock(chunk="test chunk")]
@@ -158,7 +179,9 @@ async def test_async_ragi_retrieve(mock_ragi):
 
 
 @pytest.mark.asyncio
-async def test_async_ragi_refresh(mock_ragi):
+async def test_async_ragi_refresh(
+    mock_ragi: tuple[MagicMock, MagicMock],
+) -> None:
     """Test async refresh method."""
     mock_class, mock_instance = mock_ragi
 
@@ -172,7 +195,9 @@ async def test_async_ragi_refresh(mock_ragi):
 
 
 @pytest.mark.asyncio
-async def test_async_ragi_filter(mock_ragi):
+async def test_async_ragi_filter(
+    mock_ragi: tuple[MagicMock, MagicMock],
+) -> None:
     """Test filter method (sync, returns self)."""
     mock_class, mock_instance = mock_ragi
 
@@ -186,7 +211,9 @@ async def test_async_ragi_filter(mock_ragi):
 
 
 @pytest.mark.asyncio
-async def test_async_ragi_count(mock_ragi):
+async def test_async_ragi_count(
+    mock_ragi: tuple[MagicMock, MagicMock],
+) -> None:
     """Test async count method."""
     mock_class, mock_instance = mock_ragi
 
@@ -200,7 +227,9 @@ async def test_async_ragi_count(mock_ragi):
 
 
 @pytest.mark.asyncio
-async def test_async_ragi_clear(mock_ragi):
+async def test_async_ragi_clear(
+    mock_ragi: tuple[MagicMock, MagicMock],
+) -> None:
     """Test async clear method."""
     mock_class, mock_instance = mock_ragi
 
@@ -213,7 +242,9 @@ async def test_async_ragi_clear(mock_ragi):
 
 
 @pytest.mark.asyncio
-async def test_async_ragi_graph_property(mock_ragi):
+async def test_async_ragi_graph_property(
+    mock_ragi: tuple[MagicMock, MagicMock],
+) -> None:
     """Test graph property access."""
     mock_class, mock_instance = mock_ragi
     mock_instance.graph = MagicMock(triples=lambda: [("a", "b", "c")])
@@ -227,26 +258,30 @@ async def test_async_ragi_graph_property(mock_ragi):
 
 
 @pytest.mark.asyncio
-async def test_async_ragi_callable(mock_ragi):
+async def test_async_ragi_callable(
+    mock_ragi: tuple[MagicMock, MagicMock],
+) -> None:
     """Test callable shorthand."""
     mock_class, mock_instance = mock_ragi
 
     from piragi.async_ragi import AsyncRagi
 
     kb = AsyncRagi()
-    answer = await kb("What is X?", top_k=3)
+    await kb("What is X?", top_k=3)
 
     mock_instance.ask.assert_called_once_with("What is X?", 3, None)
 
 
 @pytest.mark.asyncio
-async def test_async_ragi_concurrent_calls(mock_ragi):
+async def test_async_ragi_concurrent_calls(
+    mock_ragi: tuple[MagicMock, MagicMock],
+) -> None:
     """Test that multiple async calls can run concurrently."""
     mock_class, mock_instance = mock_ragi
 
     call_count = 0
 
-    def slow_ask(*args):
+    def slow_ask(*args: Any) -> MagicMock:
         nonlocal call_count
         call_count += 1
         return MagicMock(text=f"Answer {call_count}", citations=[])
@@ -269,7 +304,9 @@ async def test_async_ragi_concurrent_calls(mock_ragi):
 
 
 @pytest.mark.asyncio
-async def test_async_ragi_add_without_progress(mock_ragi):
+async def test_async_ragi_add_without_progress(
+    mock_ragi: tuple[MagicMock, MagicMock],
+) -> None:
     """Test add() without progress - simple await."""
     mock_class, mock_instance = mock_ragi
 
@@ -283,7 +320,9 @@ async def test_async_ragi_add_without_progress(mock_ragi):
 
 
 @pytest.mark.asyncio
-async def test_async_ragi_add_with_progress(mock_ragi):
+async def test_async_ragi_add_with_progress(
+    mock_ragi: tuple[MagicMock, MagicMock],
+) -> None:
     """Test add() with progress=True - async iterator."""
     mock_class, mock_instance = mock_ragi
 
@@ -305,9 +344,11 @@ async def test_async_ragi_add_with_progress(mock_ragi):
 
 
 @pytest.mark.asyncio
-async def test_async_ragi_add_progress_iterator_type(mock_ragi):
+async def test_async_ragi_add_progress_iterator_type(
+    mock_ragi: tuple[MagicMock, MagicMock],
+) -> None:
     """Test that add(progress=True) returns an async iterator."""
-    mock_class, mock_instance = mock_ragi
+    _mock_class, _mock_instance = mock_ragi
 
     from piragi.async_ragi import AsyncRagi, _AddIterator
 
