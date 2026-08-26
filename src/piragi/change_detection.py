@@ -1,12 +1,15 @@
 """Change detection for automatic updates."""
 
 import hashlib
+import logging
 import os
 import time
 from typing import Any
 from urllib.parse import urlparse
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 class ChangeDetector:
@@ -59,8 +62,8 @@ class ChangeDetector:
                 content = f.read()
             current_hash = ChangeDetector.compute_content_hash(content)
             return current_hash != stored_hash
-        except Exception:
-            # If we can't read, assume changed to be safe
+        except (OSError, ValueError) as e:
+            logger.warning(f"Failed to read {source}: {e}")
             return True
 
     @staticmethod

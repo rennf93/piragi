@@ -1,10 +1,13 @@
 """Retrieval and answer generation using OpenAI-compatible APIs."""
 
+import logging
 import os
 
 from openai import OpenAI
 
 from .types import Answer, Citation
+
+logger = logging.getLogger(__name__)
 
 
 class Retriever:
@@ -86,8 +89,8 @@ Return only the alternatives, one per line, without numbering or explanation."""
             ]
             return variations[:3]  # Original + 2 alternatives
 
-        except Exception:
-            # Fallback to original query on error
+        except Exception as e:
+            logger.debug(f"Query expansion failed: {e}")
             return [query]
 
     def rerank_citations(self, query: str, citations: list[Citation]) -> list[Citation]:
