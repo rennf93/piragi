@@ -413,6 +413,7 @@ class DocumentLoader:
 
         if loop and loop.is_running():
             import concurrent.futures
+
             with concurrent.futures.ThreadPoolExecutor() as pool:
                 pool.submit(asyncio.run, run_crawler()).result()
         else:
