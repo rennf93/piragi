@@ -37,8 +37,13 @@ ENV/
 # Testing
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 .tox/
+
+# MyPy, Ruff
+.mypy_cache/
+.ruff_cache/
 
 # Environment
 .env

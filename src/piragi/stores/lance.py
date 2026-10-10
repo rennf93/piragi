@@ -1,10 +1,9 @@
 """LanceDB vector store implementation."""
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..types import Chunk, Citation
-
 
 # Common embedding model dimensions
 EMBEDDING_DIMENSIONS = {
@@ -51,7 +50,7 @@ class LanceStore:
         self,
         uri: str = ".piragi",
         embedding_model: str = "all-mpnet-base-v2",
-        vector_dimension: Optional[int] = None,
+        vector_dimension: int | None = None,
     ) -> None:
         """
         Initialize LanceDB store.
@@ -77,8 +76,8 @@ class LanceStore:
 
         self.db = lancedb.connect(uri)
         self.table_name = "chunks"
-        self.table: Optional[Any] = None
-        self._chunk_texts: List[str] = []
+        self.table: Any | None = None
+        self._chunk_texts: list[str] = []
 
         # Load existing table if present
         if self.table_name in self.db.table_names():
@@ -89,7 +88,7 @@ class LanceStore:
             except Exception:
                 pass
 
-    def add_chunks(self, chunks: List[Chunk]) -> None:
+    def add_chunks(self, chunks: list[Chunk]) -> None:
         """Add chunks with embeddings to the store."""
         if not chunks:
             return
@@ -118,11 +117,11 @@ class LanceStore:
 
     def search(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int = 5,
-        filters: Optional[Dict[str, Any]] = None,
+        filters: dict[str, Any] | None = None,
         min_chunk_length: int = 100,
-    ) -> List[Citation]:
+    ) -> list[Citation]:
         """Search for similar chunks."""
         if self.table is None:
             return []
@@ -164,9 +163,9 @@ class LanceStore:
         if self.table is None:
             return 0
 
-        count_before = self.table.count_rows()
+        count_before = int(self.table.count_rows())
         self.table.delete(f"source = '{source}'")
-        count_after = self.table.count_rows()
+        count_after = int(self.table.count_rows())
 
         return count_before - count_after
 
@@ -174,7 +173,7 @@ class LanceStore:
         """Return the number of chunks in the store."""
         if self.table is None:
             return 0
-        return self.table.count_rows()
+        return int(self.table.count_rows())
 
     def clear(self) -> None:
         """Clear all data from the store."""
@@ -183,6 +182,6 @@ class LanceStore:
             self.table = None
         self._chunk_texts = []
 
-    def get_all_chunk_texts(self) -> List[str]:
+    def get_all_chunk_texts(self) -> list[str]:
         """Get all chunk texts for hybrid search."""
         return self._chunk_texts

@@ -21,14 +21,15 @@ Example:
     >>> kb = Ragi("./docs", store="s3://my-bucket/indices")
 """
 
-from .protocol import VectorStoreProtocol
 from .lance import LanceStore
-from .postgres import PostgresStore
 from .pinecone import PineconeStore
+from .postgres import PostgresStore
+from .protocol import VectorStoreProtocol
+
 try:
     from .supabase import SupabaseStore
 except ImportError:
-    SupabaseStore = None  # Optional dependency
+    SupabaseStore = None  # type: ignore[misc,assignment]
 from .factory import create_store, parse_store_uri
 
 __all__ = [

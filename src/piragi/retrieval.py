@@ -2,7 +2,6 @@
 
 import logging
 import os
-from typing import List, Optional
 
 from openai import OpenAI
 
@@ -33,7 +32,7 @@ class Retriever:
             temperature: Sampling temperature (0.0-1.0, default: 0.1)
             enable_reranking: Enable reranking of results (default: True)
             enable_query_expansion: Enable query expansion for better retrieval (default: True)
-        """
+        """  # noqa: E501
         self.model = model
         self.temperature = temperature
         self.enable_reranking = enable_reranking
@@ -52,7 +51,7 @@ class Retriever:
             base_url=base_url,
         )
 
-    def expand_query(self, query: str) -> List[str]:
+    def expand_query(self, query: str) -> list[str]:
         """
         Expand query into multiple variations for better retrieval.
 
@@ -74,7 +73,10 @@ Return only the alternatives, one per line, without numbering or explanation."""
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that rephrases questions."},
+                    {
+                        "role": "system",
+                        "content": "You are a helpful assistant that rephrases questions.",
+                    },
                     {"role": "user", "content": expansion_prompt},
                 ],
                 temperature=0.7,
@@ -82,14 +84,16 @@ Return only the alternatives, one per line, without numbering or explanation."""
             )
 
             alternatives = response.choices[0].message.content or ""
-            variations = [query] + [line.strip() for line in alternatives.split('\n') if line.strip()]
+            variations = [query] + [
+                line.strip() for line in alternatives.split("\n") if line.strip()
+            ]
             return variations[:3]  # Original + 2 alternatives
 
         except Exception as e:
             logger.debug(f"Query expansion failed: {e}")
             return [query]
 
-    def rerank_citations(self, query: str, citations: List[Citation]) -> List[Citation]:
+    def rerank_citations(self, query: str, citations: list[Citation]) -> list[Citation]:
         """
         Rerank citations by relevance to query using simple scoring.
 
@@ -120,8 +124,8 @@ Return only the alternatives, one per line, without numbering or explanation."""
     def generate_answer(
         self,
         query: str,
-        citations: List[Citation],
-        system_prompt: Optional[str] = None,
+        citations: list[Citation],
+        system_prompt: str | None = None,
     ) -> Answer:
         """
         Generate an answer from retrieved citations.
@@ -157,7 +161,7 @@ Return only the alternatives, one per line, without numbering or explanation."""
             query=query,
         )
 
-    def _build_context(self, citations: List[Citation]) -> str:
+    def _build_context(self, citations: list[Citation]) -> str:
         """Build context string from citations."""
         context_parts = []
 
@@ -171,15 +175,15 @@ Return only the alternatives, one per line, without numbering or explanation."""
         self,
         query: str,
         context: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
     ) -> str:
         """Generate answer using OpenAI-compatible API."""
         if system_prompt is None:
             system_prompt = (
-                "You are an expert assistant. Answer questions based ONLY on the provided context sources. "
-                "Your answer must be grounded in the given sources - do not add information from outside knowledge. "
+                "You are an expert assistant. Answer questions based ONLY on the provided context sources. "  # noqa: E501
+                "Your answer must be grounded in the given sources - do not add information from outside knowledge. "  # noqa: E501
                 "Always cite sources using 'According to Source X' or 'Source X states'. "
-                "If the context lacks information to fully answer the question, explain what you found and what's missing. "
+                "If the context lacks information to fully answer the question, explain what you found and what's missing. "  # noqa: E501
                 "Be specific, detailed, and accurate in your responses."
             )
 
@@ -204,4 +208,4 @@ Please answer the question based on the context provided above. Cite your source
             return response.choices[0].message.content or ""
 
         except Exception as e:
-            raise RuntimeError(f"Failed to generate answer: {e}")
+            raise RuntimeError(f"Failed to generate answer: {e}") from e

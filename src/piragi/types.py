@@ -1,6 +1,8 @@
 """Type definitions for Ragi."""
 
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -10,7 +12,7 @@ class Citation(BaseModel):
     source: str = Field(description="Source file path or URL")
     chunk: str = Field(description="The actual text chunk")
     score: float = Field(description="Relevance score (0-1)")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
     @property
     def preview(self) -> str:
@@ -22,7 +24,7 @@ class Answer(BaseModel):
     """Answer with citations from the RAG system."""
 
     text: str = Field(description="The generated answer")
-    citations: List[Citation] = Field(default_factory=list, description="Source citations")
+    citations: list[Citation] = Field(default_factory=list, description="Source citations")
     query: str = Field(description="Original query")
 
     def __str__(self) -> str:
@@ -39,9 +41,11 @@ class Document(BaseModel):
 
     content: str = Field(description="Document content in markdown")
     source: str = Field(description="Source file path or URL")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Document metadata")
-    content_hash: Optional[str] = Field(default=None, description="Hash of content for change detection")
-    last_modified: Optional[float] = Field(default=None, description="Last modification timestamp")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Document metadata")
+    content_hash: str | None = Field(
+        default=None, description="Hash of content for change detection"
+    )
+    last_modified: float | None = Field(default=None, description="Last modification timestamp")
 
 
 class Chunk(BaseModel):
@@ -50,10 +54,10 @@ class Chunk(BaseModel):
     text: str = Field(description="Chunk text")
     source: str = Field(description="Source document")
     chunk_index: int = Field(description="Index of chunk in document")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Chunk metadata")
-    embedding: Optional[List[float]] = Field(default=None, description="Vector embedding")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Chunk metadata")
+    embedding: list[float] | None = Field(default=None, description="Vector embedding")
 
 
 # Type aliases for hooks
-DocumentHook = Callable[[List["Document"]], List["Document"]]
-ChunkHook = Callable[[List["Chunk"]], List["Chunk"]]
+DocumentHook = Callable[[list["Document"]], list["Document"]]
+ChunkHook = Callable[[list["Chunk"]], list["Chunk"]]

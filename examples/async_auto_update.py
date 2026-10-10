@@ -1,19 +1,18 @@
 """Example: Async auto-update with background workers."""
 
+import logging
 import os
 import tempfile
 import time
-import logging
+
 from piragi import Ragi
-from ragi.async_updater import AsyncUpdater
+from piragi.async_updater import AsyncUpdater
 
 # Enable logging to see update activity
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(threadName)s] %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(threadName)s] %(message)s")
 
 
-def example_async_background_updates():
+def example_async_background_updates() -> None:
     """Demonstrate async background updates without blocking queries."""
     print("=" * 60)
     print("Async Background Updates (Non-Blocking)")
@@ -48,9 +47,9 @@ def example_async_background_updates():
 
         # Register sources
         print("\n2. Registering sources for auto-update...")
-        with open(doc1, "r") as f:
+        with open(doc1) as f:
             updater.register_source(doc1, f.read(), check_interval=3.0)
-        with open(doc2, "r") as f:
+        with open(doc2) as f:
             updater.register_source(doc2, f.read(), check_interval=5.0)
 
         # Start background workers
@@ -60,7 +59,7 @@ def example_async_background_updates():
         # Query while background updates happen
         print("4. Querying knowledge base (updates happen in background)...")
         answer = kb.ask("What is the price of Product A?")
-        print(f"   Q: What is the price of Product A?")
+        print("   Q: What is the price of Product A?")
         print(f"   A: {answer.text[:100]}...\n")
 
         # Simulate document update
@@ -80,9 +79,7 @@ def example_async_background_updates():
             answer = kb.ask("What is the price of Product A?")
             query_time = (time.time() - start) * 1000
 
-            print(
-                f"   [{i+1}] Query latency: {query_time:.0f}ms | Answer: {answer.text[:60]}..."
-            )
+            print(f"   [{i + 1}] Query latency: {query_time:.0f}ms | Answer: {answer.text[:60]}...")
 
         # Show stats
         print("\n7. Update statistics:")
@@ -95,7 +92,7 @@ def example_async_background_updates():
         updater.stop()
 
 
-def example_manual_queue():
+def example_manual_queue() -> None:
     """Demonstrate manually queuing updates."""
     print("\n" + "=" * 60)
     print("Manual Update Queue")
@@ -120,7 +117,7 @@ def example_manual_queue():
             max_workers=1,
         )
 
-        with open(doc_path, "r") as f:
+        with open(doc_path) as f:
             updater.register_source(doc_path, f.read())
 
         updater.start()
@@ -157,7 +154,7 @@ def example_manual_queue():
         updater.stop()
 
 
-def example_concurrent_queries_and_updates():
+def example_concurrent_queries_and_updates() -> None:
     """Demonstrate queries continue during updates."""
     print("\n" + "=" * 60)
     print("Concurrent Queries + Updates (No Blocking)")
@@ -181,12 +178,10 @@ def example_concurrent_queries_and_updates():
         print(f"\n1. Loaded {len(docs)} documents, {kb.count()} chunks")
 
         # Setup updater
-        updater = AsyncUpdater(
-            refresh_callback=kb.refresh, check_interval=2.0, max_workers=3
-        )
+        updater = AsyncUpdater(refresh_callback=kb.refresh, check_interval=2.0, max_workers=3)
 
         for doc in docs:
-            with open(doc, "r") as f:
+            with open(doc) as f:
                 updater.register_source(doc, f.read(), check_interval=2.0)
 
         updater.start()
@@ -198,16 +193,14 @@ def example_concurrent_queries_and_updates():
             # Update a document
             doc = docs[i % len(docs)]
             with open(doc, "w") as f:
-                f.write(f"# Document {i % len(docs)}\n\nContent version {i+2}")
+                f.write(f"# Document {i % len(docs)}\n\nContent version {i + 2}")
 
             # Query immediately (not blocked by update!)
             start = time.time()
-            answer = kb.ask(f"What is in document {i % len(docs)}?")
+            kb.ask(f"What is in document {i % len(docs)}?")
             query_time = (time.time() - start) * 1000
 
-            print(
-                f"   [{i+1}] Updated doc{i % len(docs)}, query latency: {query_time:.0f}ms"
-            )
+            print(f"   [{i + 1}] Updated doc{i % len(docs)}, query latency: {query_time:.0f}ms")
 
             time.sleep(1)
 
@@ -215,7 +208,7 @@ def example_concurrent_queries_and_updates():
         print("   Background workers handled updates asynchronously")
 
         stats = updater.get_stats()
-        print(f"\n4. Final stats:")
+        print("\n4. Final stats:")
         print(f"   Checks: {stats['checks_performed']}")
         print(f"   Updates: {stats['updates_performed']}")
         print(f"   Queue size: {stats['queue_size']}")
@@ -223,7 +216,7 @@ def example_concurrent_queries_and_updates():
         updater.stop()
 
 
-def main():
+def main() -> None:
     """Run all async update examples."""
     example_async_background_updates()
     example_manual_queue()
@@ -282,7 +275,7 @@ Architecture:
 Configuration:
 ```python
 from piragi import Ragi
-from ragi.async_updater import AsyncUpdater
+from piragi.async_updater import AsyncUpdater
 
 kb = Ragi("./docs")
 

@@ -1,8 +1,8 @@
 """Supabase vector store using pgvector."""
 
-from typing import Any, Dict, List, Optional
 import json
 import os
+from typing import Any
 
 from ..types import Chunk, Citation
 
@@ -90,8 +90,8 @@ class SupabaseStore:
 
     def __init__(
         self,
-        url: Optional[str] = None,
-        key: Optional[str] = None,
+        url: str | None = None,
+        key: str | None = None,
         table_name: str = "piragi_chunks",
         function_name: str = "match_piragi_chunks",
         vector_dimension: int = 384,
@@ -108,11 +108,10 @@ class SupabaseStore:
         """
         try:
             from supabase import create_client
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
-                "SupabaseStore requires supabase-py. "
-                "Install with: pip install piragi[supabase]"
-            )
+                "SupabaseStore requires supabase-py. Install with: pip install piragi[supabase]"
+            ) from e
 
         self.url = url or os.environ.get("SUPABASE_URL")
         self.key = key or os.environ.get("SUPABASE_SERVICE_KEY")
@@ -128,7 +127,7 @@ class SupabaseStore:
         self.table_name = table_name
         self.function_name = function_name
         self.vector_dimension = vector_dimension
-        self._chunk_texts: List[str] = []
+        self._chunk_texts: list[str] = []
 
         # Load existing chunk texts for hybrid search
         self._load_chunk_texts()
@@ -137,12 +136,16 @@ class SupabaseStore:
         """Load all chunk texts for hybrid search indexing."""
         try:
             result = self.client.table(self.table_name).select("text").execute()
-            self._chunk_texts = [row["text"] for row in result.data]
+            data = result.data
+            if isinstance(data, list):
+                self._chunk_texts = [str(row["text"]) for row in data if isinstance(row, dict)]
+            else:
+                self._chunk_texts = []
         except Exception:
             # Table may not exist yet
             self._chunk_texts = []
 
-    def add_chunks(self, chunks: List[Chunk]) -> None:
+    def add_chunks(self, chunks: list[Chunk]) -> None:
         """
         Add chunks with embeddings to the store.
 
@@ -175,10 +178,10 @@ class SupabaseStore:
 
     def search(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int = 5,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[Citation]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[Citation]:
         """
         Search for similar chunks using cosine similarity.
 
@@ -191,7 +194,7 @@ class SupabaseStore:
             List of Citation objects with similarity scores
         """
         # Build RPC parameters
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "query_embedding": query_embedding,
             "match_count": top_k,
         }
@@ -203,25 +206,32 @@ class SupabaseStore:
         try:
             result = self.client.rpc(self.function_name, params).execute()
 
-            return [
-                Citation(
-                    source=row["source"],
-                    chunk=row["text"],
-                    score=float(row.get("similarity", 0)),
-                    metadata=row.get("metadata") or {},
+            citations: list[Citation] = []
+            data = result.data
+            if not isinstance(data, list):
+                return self._search_fallback(query_embedding, top_k, filters)
+            for row in data:
+                if not isinstance(row, dict):
+                    continue
+                citations.append(
+                    Citation(
+                        source=str(row["source"]),
+                        chunk=str(row["text"]),
+                        score=float(row.get("similarity", 0)),
+                        metadata=dict(row.get("metadata") or {}),
+                    )
                 )
-                for row in result.data
-            ]
-        except Exception as e:
+            return citations
+        except Exception:
             # Fall back to client-side similarity if RPC fails
             return self._search_fallback(query_embedding, top_k, filters)
 
     def _search_fallback(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[Citation]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[Citation]:
         """
         Fallback search computing similarity client-side.
 
@@ -238,9 +248,14 @@ class SupabaseStore:
         result = query.limit(1000).execute()
 
         query_vec = np.array(query_embedding, dtype=np.float32)
-        scored = []
+        scored: list[tuple[dict[str, Any], float]] = []
 
-        for row in result.data:
+        data = result.data
+        if not isinstance(data, list):
+            return []
+        for row in data:
+            if not isinstance(row, dict):
+                continue
             emb = row.get("embedding")
             if emb:
                 # Handle string-encoded vectors from Supabase
@@ -257,10 +272,10 @@ class SupabaseStore:
 
         return [
             Citation(
-                source=row["source"],
-                chunk=row["text"],
+                source=str(row["source"]),
+                chunk=str(row["text"]),
                 score=score,
-                metadata=row.get("metadata") or {},
+                metadata=dict(row.get("metadata") or {}),
             )
             for row, score in scored[:top_k]
         ]
@@ -275,23 +290,16 @@ class SupabaseStore:
         Returns:
             Number of chunks deleted
         """
-        result = (
-            self.client.table(self.table_name)
-            .delete()
-            .eq("source", source)
-            .execute()
-        )
+        result = self.client.table(self.table_name).delete().eq("source", source).execute()
         deleted = len(result.data)
         self._load_chunk_texts()
         return deleted
 
     def count(self) -> int:
         """Return the number of chunks in the store."""
-        result = (
-            self.client.table(self.table_name)
-            .select("id", count="exact")
-            .execute()
-        )
+        from postgrest.types import CountMethod  # type: ignore[import-not-found]
+
+        result = self.client.table(self.table_name).select("id", count=CountMethod.exact).execute()
         return result.count or 0
 
     def clear(self) -> None:
@@ -302,6 +310,6 @@ class SupabaseStore:
         ).execute()
         self._chunk_texts = []
 
-    def get_all_chunk_texts(self) -> List[str]:
+    def get_all_chunk_texts(self) -> list[str]:
         """Get all chunk texts for hybrid search indexing."""
         return self._chunk_texts

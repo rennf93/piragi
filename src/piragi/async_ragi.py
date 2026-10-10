@@ -2,7 +2,8 @@
 
 import asyncio
 import queue
-from typing import Any, AsyncIterator, Dict, List, Optional, Union
+from collections.abc import AsyncIterator
+from typing import Any, Literal, Union, overload
 
 from .core import Ragi
 from .embeddings import EmbeddingGenerator
@@ -42,12 +43,12 @@ class AsyncRagi:
 
     def __init__(
         self,
-        sources: Union[str, List[str], None] = None,
+        sources: str | list[str] | None = None,
         persist_dir: str = ".piragi",
-        config: Optional[Dict[str, Any]] = None,
-        store: Union[str, Dict[str, Any], VectorStoreProtocol, None] = None,
+        config: dict[str, Any] | None = None,
+        store: str | dict[str, Any] | VectorStoreProtocol | None = None,
         graph: bool = False,
-        embedder: Optional[EmbeddingGenerator] = None,
+        embedder: EmbeddingGenerator | None = None,
     ) -> None:
         """
         Initialize AsyncRagi with optional document sources.
@@ -71,9 +72,23 @@ class AsyncRagi:
             embedder=embedder,
         )
 
+    @overload
     def add(
         self,
-        sources: Union[str, List[str]],
+        sources: str | list[str],
+        progress: Literal[False] = ...,
+    ) -> "_AddAwaitable": ...
+
+    @overload
+    def add(
+        self,
+        sources: str | list[str],
+        progress: Literal[True],
+    ) -> "_AddIterator": ...
+
+    def add(
+        self,
+        sources: str | list[str],
         progress: bool = False,
     ) -> Union["_AddAwaitable", "_AddIterator"]:
         """
@@ -102,7 +117,7 @@ class AsyncRagi:
         self,
         query: str,
         top_k: int = 5,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
     ) -> Answer:
         """
         Ask a question and get an answer with citations (non-blocking).
@@ -115,11 +130,9 @@ class AsyncRagi:
         Returns:
             Answer with citations
         """
-        return await asyncio.to_thread(
-            self._sync.ask, query, top_k, system_prompt
-        )
+        return await asyncio.to_thread(self._sync.ask, query, top_k, system_prompt)
 
-    async def retrieve(self, query: str, top_k: int = 5) -> List:
+    async def retrieve(self, query: str, top_k: int = 5) -> list:
         """
         Retrieve relevant chunks without LLM generation (non-blocking).
 
@@ -132,7 +145,7 @@ class AsyncRagi:
         """
         return await asyncio.to_thread(self._sync.retrieve, query, top_k)
 
-    async def refresh(self, sources: Union[str, List[str]]) -> "AsyncRagi":
+    async def refresh(self, sources: str | list[str]) -> "AsyncRagi":
         """
         Refresh specific sources (non-blocking).
 
@@ -167,7 +180,7 @@ class AsyncRagi:
         await asyncio.to_thread(self._sync.clear)
 
     @property
-    def graph(self):
+    def graph(self) -> Any:
         """Access the knowledge graph for direct queries."""
         return self._sync.graph
 
@@ -179,11 +192,11 @@ class AsyncRagi:
 class _AddAwaitable:
     """Awaitable wrapper for add() without progress."""
 
-    def __init__(self, ragi: AsyncRagi, sources: Union[str, List[str]]) -> None:
+    def __init__(self, ragi: AsyncRagi, sources: str | list[str]) -> None:
         self._ragi = ragi
         self._sources = sources
 
-    def __await__(self):
+    def __await__(self) -> Any:
         return self._run().__await__()
 
     async def _run(self) -> AsyncRagi:
@@ -194,12 +207,12 @@ class _AddAwaitable:
 class _AddIterator:
     """Async iterator wrapper for add() with progress."""
 
-    def __init__(self, ragi: AsyncRagi, sources: Union[str, List[str]]) -> None:
+    def __init__(self, ragi: AsyncRagi, sources: str | list[str]) -> None:
         self._ragi = ragi
         self._sources = sources
         self._queue: queue.Queue = queue.Queue()
         self._done = False
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
 
     def __aiter__(self) -> AsyncIterator[str]:
         return self
@@ -212,11 +225,11 @@ class _AddIterator:
         # Poll for progress messages
         while True:
             try:
-                msg = self._queue.get_nowait()
+                msg: str = self._queue.get_nowait()
                 return msg
             except queue.Empty:
                 if self._done:
-                    raise StopAsyncIteration
+                    raise StopAsyncIteration from None
                 # Wait a bit before polling again
                 await asyncio.sleep(0.05)
 
@@ -224,7 +237,5 @@ class _AddIterator:
         def on_progress(msg: str) -> None:
             self._queue.put(msg)
 
-        await asyncio.to_thread(
-            self._ragi._sync.add, self._sources, on_progress
-        )
+        await asyncio.to_thread(self._ragi._sync.add, self._sources, on_progress)
         self._done = True

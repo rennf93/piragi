@@ -1,7 +1,7 @@
 """Pinecone vector store implementation."""
 
-from typing import Any, Dict, List, Optional
 import uuid
+from typing import Any
 
 from ..types import Chunk, Citation
 
@@ -25,7 +25,7 @@ class PineconeStore:
         self,
         api_key: str,
         index_name: str,
-        environment: Optional[str] = None,
+        environment: str | None = None,
         namespace: str = "default",
         vector_dimension: int = 768,
     ) -> None:
@@ -41,18 +41,17 @@ class PineconeStore:
         """
         try:
             from pinecone import Pinecone
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
-                "PineconeStore requires pinecone-client. "
-                "Install with: pip install piragi[pinecone]"
-            )
+                "PineconeStore requires pinecone-client. Install with: pip install piragi[pinecone]"
+            ) from e
 
         self.api_key = api_key
         self.index_name = index_name
         self.namespace = namespace
         self.vector_dimension = vector_dimension
-        self._chunk_texts: List[str] = []
-        self._chunk_map: Dict[str, str] = {}  # id -> text mapping
+        self._chunk_texts: list[str] = []
+        self._chunk_map: dict[str, str] = {}  # id -> text mapping
 
         # Initialize Pinecone
         self.pc = Pinecone(api_key=api_key)
@@ -75,7 +74,7 @@ class PineconeStore:
 
         self.index = self.pc.Index(index_name)
 
-    def add_chunks(self, chunks: List[Chunk]) -> None:
+    def add_chunks(self, chunks: list[Chunk]) -> None:
         """Add chunks with embeddings to the store."""
         if not chunks:
             return
@@ -88,16 +87,18 @@ class PineconeStore:
         for chunk in chunks:
             chunk_id = str(uuid.uuid4())
 
-            vectors.append({
-                "id": chunk_id,
-                "values": chunk.embedding,
-                "metadata": {
-                    "text": chunk.text,
-                    "source": chunk.source,
-                    "chunk_index": chunk.chunk_index,
-                    **chunk.metadata,
-                },
-            })
+            vectors.append(
+                {
+                    "id": chunk_id,
+                    "values": chunk.embedding,
+                    "metadata": {
+                        "text": chunk.text,
+                        "source": chunk.source,
+                        "chunk_index": chunk.chunk_index,
+                        **chunk.metadata,
+                    },
+                }
+            )
 
             self._chunk_texts.append(chunk.text)
             self._chunk_map[chunk_id] = chunk.text
@@ -110,11 +111,11 @@ class PineconeStore:
 
     def search(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int = 5,
-        filters: Optional[Dict[str, Any]] = None,
+        filters: dict[str, Any] | None = None,
         min_chunk_length: int = 100,
-    ) -> List[Citation]:
+    ) -> list[Citation]:
         """Search for similar chunks."""
         # Build filter
         pinecone_filter = None
@@ -143,7 +144,7 @@ class PineconeStore:
             # Extract source and clean metadata
             source = metadata.pop("text", "")
             source = metadata.pop("source", "unknown")
-            chunk_index = metadata.pop("chunk_index", 0)
+            metadata.pop("chunk_index", 0)
 
             citations.append(
                 Citation(
@@ -193,7 +194,7 @@ class PineconeStore:
         """Return the number of chunks in the store."""
         stats = self.index.describe_index_stats()
         namespace_stats = stats.namespaces.get(self.namespace, {})
-        return namespace_stats.get("vector_count", 0)
+        return int(namespace_stats.get("vector_count", 0))
 
     def clear(self) -> None:
         """Clear all data from the store."""
@@ -201,6 +202,6 @@ class PineconeStore:
         self._chunk_texts = []
         self._chunk_map = {}
 
-    def get_all_chunk_texts(self) -> List[str]:
+    def get_all_chunk_texts(self) -> list[str]:
         """Get all chunk texts for hybrid search."""
         return self._chunk_texts

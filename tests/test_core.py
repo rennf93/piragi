@@ -1,32 +1,34 @@
 """Tests for core Ragi class."""
 
 import os
+from collections.abc import Callable
 from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pytest
 
 from piragi import Ragi
-from piragi.types import Answer, Citation
+from piragi.types import Answer, Chunk
 
 
 @pytest.fixture
-def mock_embeddings():
+def mock_embeddings() -> list[float]:
     """Mock embedding responses (768-dim for all-mpnet-base-v2)."""
     return [0.1] * 768
 
 
 @pytest.fixture
-def mock_llm_response():
+def mock_llm_response() -> str:
     """Mock LLM response."""
     return "This is a test answer based on the provided context."
 
 
-def create_mock_embedding_generator(mock_embeddings):
+def create_mock_embedding_generator(mock_embeddings: list[float]) -> MagicMock:
     """Create a mock EmbeddingGenerator for testing."""
     mock_gen = MagicMock()
 
-    def embed_chunks_side_effect(chunks, on_progress=None):
+    def embed_chunks_side_effect(
+        chunks: list[Chunk], on_progress: Callable[[str], None] | None = None
+    ) -> list[Chunk]:
         for chunk in chunks:
             chunk.embedding = mock_embeddings
         return chunks
@@ -39,7 +41,7 @@ def create_mock_embedding_generator(mock_embeddings):
 class TestRagiInit:
     """Tests for Ragi initialization."""
 
-    def test_init_without_sources(self, temp_dir):
+    def test_init_without_sources(self, temp_dir: str) -> None:
         """Test initialization without sources."""
         persist_dir = os.path.join(temp_dir, "test_ragi")
         kb = Ragi(persist_dir=persist_dir)
@@ -47,13 +49,10 @@ class TestRagiInit:
         assert kb.store.count() == 0
 
     @patch("piragi.retrieval.OpenAI")
-    def test_init_with_config(self, mock_openai, temp_dir):
+    def test_init_with_config(self, mock_openai: MagicMock, temp_dir: str) -> None:
         """Test initialization with custom config."""
         persist_dir = os.path.join(temp_dir, "test_ragi")
-        kb = Ragi(
-            persist_dir=persist_dir,
-            config={"llm": {"model": "gpt-4", "api_key": "custom-key"}}
-        )
+        Ragi(persist_dir=persist_dir, config={"llm": {"model": "gpt-4", "api_key": "custom-key"}})
 
         # Verify OpenAI was initialized
         mock_openai.assert_called()
@@ -63,7 +62,13 @@ class TestRagiAdd:
     """Tests for adding documents."""
 
     @patch("piragi.core.EmbeddingGenerator")
-    def test_add_single_file(self, mock_embed_gen, temp_dir, sample_text_file, mock_embeddings):
+    def test_add_single_file(
+        self,
+        mock_embed_gen: MagicMock,
+        temp_dir: str,
+        sample_text_file: str,
+        mock_embeddings: list[float],
+    ) -> None:
         """Test adding a single file."""
         mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
 
@@ -75,7 +80,12 @@ class TestRagiAdd:
 
     @patch("piragi.core.EmbeddingGenerator")
     def test_add_multiple_files(
-        self, mock_embed_gen, temp_dir, sample_text_file, sample_markdown_file, mock_embeddings
+        self,
+        mock_embed_gen: MagicMock,
+        temp_dir: str,
+        sample_text_file: str,
+        sample_markdown_file: str,
+        mock_embeddings: list[float],
     ):
         """Test adding multiple files."""
         mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
@@ -87,7 +97,13 @@ class TestRagiAdd:
         assert kb.count() > 0
 
     @patch("piragi.core.EmbeddingGenerator")
-    def test_add_returns_self(self, mock_embed_gen, temp_dir, sample_text_file, mock_embeddings):
+    def test_add_returns_self(
+        self,
+        mock_embed_gen: MagicMock,
+        temp_dir: str,
+        sample_text_file: str,
+        mock_embeddings: list[float],
+    ) -> None:
         """Test that add() returns self for chaining."""
         mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
 
@@ -105,13 +121,13 @@ class TestRagiQuery:
     @patch("piragi.core.EmbeddingGenerator")
     def test_ask_question(
         self,
-        mock_embed_gen,
-        mock_openai,
-        temp_dir,
-        sample_text_file,
-        mock_embeddings,
-        mock_llm_response,
-    ):
+        mock_embed_gen: MagicMock,
+        mock_openai: MagicMock,
+        temp_dir: str,
+        sample_text_file: str,
+        mock_embeddings: list[float],
+        mock_llm_response: str,
+    ) -> None:
         """Test asking a question."""
         mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
 
@@ -136,13 +152,13 @@ class TestRagiQuery:
     @patch("piragi.core.EmbeddingGenerator")
     def test_callable_interface(
         self,
-        mock_embed_gen,
-        mock_openai,
-        temp_dir,
-        sample_text_file,
-        mock_embeddings,
-        mock_llm_response,
-    ):
+        mock_embed_gen: MagicMock,
+        mock_openai: MagicMock,
+        temp_dir: str,
+        sample_text_file: str,
+        mock_embeddings: list[float],
+        mock_llm_response: str,
+    ) -> None:
         """Test using Ragi as callable."""
         mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
 
@@ -165,7 +181,7 @@ class TestRagiQuery:
 class TestRagiFilter:
     """Tests for metadata filtering."""
 
-    def test_filter_returns_self(self, temp_dir):
+    def test_filter_returns_self(self, temp_dir: str) -> None:
         """Test that filter() returns self for chaining."""
         persist_dir = os.path.join(temp_dir, "test_ragi")
         kb = Ragi(persist_dir=persist_dir)
@@ -177,13 +193,13 @@ class TestRagiFilter:
     @patch("piragi.core.EmbeddingGenerator")
     def test_filter_chaining(
         self,
-        mock_embed_gen,
-        mock_openai,
-        temp_dir,
-        sample_text_file,
-        mock_embeddings,
-        mock_llm_response,
-    ):
+        mock_embed_gen: MagicMock,
+        mock_openai: MagicMock,
+        temp_dir: str,
+        sample_text_file: str,
+        mock_embeddings: list[float],
+        mock_llm_response: str,
+    ) -> None:
         """Test filter chaining with ask."""
         mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
 
@@ -198,7 +214,8 @@ class TestRagiFilter:
         kb = Ragi(persist_dir=persist_dir)
         kb.add(sample_text_file)
 
-        answer = kb.filter(type="test").ask("What is this?")
+        # Filter by file_type which is added by the loader
+        answer = kb.filter(file_type="txt").ask("What is this?")
 
         assert isinstance(answer, Answer)
 
@@ -206,7 +223,7 @@ class TestRagiFilter:
 class TestRagiEmbedderInjection:
     """Tests for custom embedder injection."""
 
-    def test_init_with_custom_embedder(self, temp_dir, mock_embeddings):
+    def test_init_with_custom_embedder(self, temp_dir: str, mock_embeddings: list[float]) -> None:
         """Test initialization with custom embedder."""
         mock_embedder = create_mock_embedding_generator(mock_embeddings)
 
@@ -217,8 +234,8 @@ class TestRagiEmbedderInjection:
         assert kb.embedder is mock_embedder
 
     def test_custom_embedder_used_for_add(
-        self, temp_dir, sample_text_file, mock_embeddings
-    ):
+        self, temp_dir: str, sample_text_file: str, mock_embeddings: list[float]
+    ) -> None:
         """Test that custom embedder is used when adding documents."""
         mock_embedder = create_mock_embedding_generator(mock_embeddings)
 
@@ -230,7 +247,9 @@ class TestRagiEmbedderInjection:
         mock_embedder.embed_chunks.assert_called()
         assert kb.count() > 0
 
-    def test_shared_embedder_across_instances(self, temp_dir, mock_embeddings):
+    def test_shared_embedder_across_instances(
+        self, temp_dir: str, mock_embeddings: list[float]
+    ) -> None:
         """Test that same embedder can be shared across multiple Ragi instances."""
         mock_embedder = create_mock_embedding_generator(mock_embeddings)
 
@@ -244,7 +263,9 @@ class TestRagiEmbedderInjection:
         assert kb1.embedder is kb2.embedder
         assert kb1.embedder is mock_embedder
 
-    def test_custom_embedder_overrides_config(self, temp_dir, mock_embeddings):
+    def test_custom_embedder_overrides_config(
+        self, temp_dir: str, mock_embeddings: list[float]
+    ) -> None:
         """Test that custom embedder takes precedence over config."""
         mock_embedder = create_mock_embedding_generator(mock_embeddings)
         mock_embedder.model_name = "custom-model"
@@ -253,7 +274,7 @@ class TestRagiEmbedderInjection:
         kb = Ragi(
             persist_dir=persist_dir,
             embedder=mock_embedder,
-            config={"embedding": {"model": "different-model"}}
+            config={"embedding": {"model": "different-model"}},
         )
 
         # Custom embedder should be used, not the one from config
@@ -262,12 +283,12 @@ class TestRagiEmbedderInjection:
     @patch("piragi.retrieval.OpenAI")
     def test_custom_embedder_used_for_query(
         self,
-        mock_openai,
-        temp_dir,
-        sample_text_file,
-        mock_embeddings,
-        mock_llm_response,
-    ):
+        mock_openai: MagicMock,
+        temp_dir: str,
+        sample_text_file: str,
+        mock_embeddings: list[float],
+        mock_llm_response: str,
+    ) -> None:
         """Test that custom embedder is used for query embedding."""
         mock_embedder = create_mock_embedding_generator(mock_embeddings)
 
@@ -291,7 +312,7 @@ class TestRagiEmbedderInjection:
 class TestRagiUtility:
     """Tests for utility methods."""
 
-    def test_count_empty(self, temp_dir):
+    def test_count_empty(self, temp_dir: str) -> None:
         """Test count on empty store."""
         persist_dir = os.path.join(temp_dir, "test_ragi")
         kb = Ragi(persist_dir=persist_dir)
@@ -299,7 +320,13 @@ class TestRagiUtility:
         assert kb.count() == 0
 
     @patch("piragi.core.EmbeddingGenerator")
-    def test_clear(self, mock_embed_gen, temp_dir, sample_text_file, mock_embeddings):
+    def test_clear(
+        self,
+        mock_embed_gen: MagicMock,
+        temp_dir: str,
+        sample_text_file: str,
+        mock_embeddings: list[float],
+    ) -> None:
         """Test clearing the knowledge base."""
         mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
 

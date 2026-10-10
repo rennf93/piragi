@@ -7,26 +7,27 @@ This is a simplified version designed for public demos:
 - No persistent storage
 """
 
-import os
-import sys
-import shutil
-import tempfile
 import logging
+import os
+import shutil
+import sys
+import tempfile
 import time
 import uuid
 from pathlib import Path
+from typing import Any
 
 import streamlit as st
 
 # Configure logging (set to WARNING for production, INFO for debugging)
-logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-from piragi import Ragi
+from piragi import Ragi  # noqa: E402
 
 # Page config
 st.set_page_config(
@@ -38,7 +39,9 @@ st.set_page_config(
 # Initialize session-specific state
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
-    st.session_state.session_dir = Path(tempfile.mkdtemp(prefix=f"piragi_demo_{st.session_state.session_id[:8]}_"))
+    st.session_state.session_dir = Path(
+        tempfile.mkdtemp(prefix=f"piragi_demo_{st.session_state.session_id[:8]}_")
+    )
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "demo_kb" not in st.session_state:
@@ -50,19 +53,22 @@ if "uploaded_files" not in st.session_state:
 SESSION_DIR = st.session_state.session_dir
 
 # Custom CSS
-st.markdown("""
+st.markdown(
+    """
 <style>
     .stApp { max-width: 100%; }
     .stMainBlockContainer { max-width: 65%; margin: 0 auto; }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 
-def get_llm_config():
+def get_llm_config() -> dict[str, Any]:
     """Get LLM config - prefers HF_TOKEN, falls back to OPENAI_API_KEY."""
     hf_token = os.environ.get("HF_TOKEN", "")
     openai_key = os.environ.get("OPENAI_API_KEY", "")
-    
+
     if openai_key:
         return {
             "model": "gpt-4o-mini",
@@ -83,10 +89,10 @@ def get_llm_config():
         }
 
 
-def get_kb_config():
+def get_kb_config() -> dict[str, Any]:
     """Get KB config from session state."""
     strategy = st.session_state.get("chunk_strategy", "fixed")
-    
+
     chunk_cfg = {"strategy": strategy}
     if strategy == "fixed":
         chunk_cfg["size"] = st.session_state.get("chunk_size", 512)
@@ -98,7 +104,7 @@ def get_kb_config():
     elif strategy == "hierarchical":
         chunk_cfg["parent_size"] = st.session_state.get("parent_size", 2000)
         chunk_cfg["child_size"] = st.session_state.get("child_size", 400)
-    
+
     return {
         "llm": get_llm_config(),
         "embedding": {"model": "all-MiniLM-L6-v2"},
@@ -112,32 +118,33 @@ def get_kb_config():
     }
 
 
-def get_or_create_kb():
+def get_or_create_kb() -> Ragi:
     """Get or create KB for this session, recreating if config changed."""
     config = get_kb_config()
     config_key = str(config.get("chunk", {}))
-    
+
     # Recreate KB if chunking config changed
     if st.session_state.get("last_config_key") != config_key:
         if st.session_state.demo_kb is not None:
             st.session_state.demo_kb.clear()
             st.session_state.demo_kb = None
         st.session_state.last_config_key = config_key
-    
+
     if st.session_state.demo_kb is None:
         st.session_state.demo_kb = Ragi(persist_dir=str(SESSION_DIR), config=config)
-    
-    return st.session_state.demo_kb
+
+    kb: Ragi = st.session_state.demo_kb
+    return kb
 
 
-def load_sample_docs(kb):
+def load_sample_docs(kb: Ragi) -> list[str]:
     """Load piragi's main docs as sample content."""
     repo_root = Path(__file__).resolve().parent.parent
     sample_files = [
         ("README.md", repo_root / "README.md"),
         ("API.md", repo_root / "API.md"),
     ]
-    
+
     loaded = []
     for name, filepath in sample_files:
         if filepath.exists() and filepath.stat().st_size > 1000:
@@ -149,7 +156,7 @@ def load_sample_docs(kb):
     return loaded
 
 
-def main():
+def main() -> None:
     st.title("📚 Piragi Demo")
     st.caption("Zero-setup RAG with smart citations • [GitHub](https://github.com/hemanth/piragi)")
 
@@ -158,7 +165,7 @@ def main():
     # Sidebar
     with st.sidebar:
         st.header("⚙️ Configuration")
-        
+
         # Learn more expander
         with st.expander("📖 What do these settings mean?"):
             st.markdown("""
@@ -181,24 +188,33 @@ Ways to improve search accuracy:
 **Top K**
 
 How many chunks to retrieve. More = broader context but potentially more noise.
-            """)
-        
+            """)  # noqa: E501
+
         st.divider()
-        
+
         # Chunking strategy
         strategy = st.selectbox(
             "Chunking Strategy",
             options=["fixed", "semantic", "hierarchical"],
             key="chunk_strategy",
-            help="How to split documents into chunks. Note: 'contextual' (LLM-based) is disabled in demo to avoid rate limits.",
+            help="How to split documents into chunks. Note: 'contextual' (LLM-based) is disabled in demo to avoid rate limits.",  # noqa: E501
         )
-        
+
         if strategy == "fixed":
             col1, col2 = st.columns(2)
             with col1:
-                st.number_input("Chunk size", min_value=100, max_value=2000, value=512, step=100, key="chunk_size")
+                st.number_input(
+                    "Chunk size",
+                    min_value=100,
+                    max_value=2000,
+                    value=512,
+                    step=100,
+                    key="chunk_size",
+                )
             with col2:
-                st.number_input("Overlap", min_value=0, max_value=200, value=50, step=10, key="chunk_overlap")
+                st.number_input(
+                    "Overlap", min_value=0, max_value=200, value=50, step=10, key="chunk_overlap"
+                )
         elif strategy == "semantic":
             st.slider("Similarity threshold", 0.0, 1.0, 0.5, 0.05, key="similarity_threshold")
         elif strategy == "hierarchical":
@@ -207,16 +223,16 @@ How many chunks to retrieve. More = broader context but potentially more noise.
                 st.number_input("Parent size", value=2000, key="parent_size")
             with col2:
                 st.number_input("Child size", value=400, key="child_size")
-        
+
         st.subheader("Retrieval")
         st.checkbox("HyDE", key="use_hyde", help="Hypothetical Document Embeddings")
         st.checkbox("Hybrid Search", key="use_hybrid", help="Semantic + BM25")
         st.checkbox("Reranker", key="use_reranker", help="Cross-encoder reranking")
         st.number_input("Top K", min_value=1, max_value=20, value=5, key="top_k")
-        
+
         st.divider()
         st.header("📁 Documents")
-        
+
         # Load sample docs button
         if st.button("📄 Load Sample Docs", type="primary", use_container_width=True):
             with st.spinner("Loading piragi docs..."):
@@ -227,18 +243,18 @@ How many chunks to retrieve. More = broader context but potentially more noise.
                 else:
                     st.warning("No sample docs found")
             st.rerun()
-        
+
         # Show what sample docs contain
         if st.session_state.get("loaded_sample_docs"):
             st.caption("📚 Loaded: Piragi README & API docs")
-        
+
         # File uploader (ephemeral)
         uploaded_files = st.file_uploader(
             "Or upload your own",
             type=["txt", "md", "pdf", "html", "docx"],
             accept_multiple_files=True,
         )
-        
+
         if uploaded_files:
             for file in uploaded_files:
                 if file.name not in st.session_state.uploaded_files:
@@ -251,47 +267,52 @@ How many chunks to retrieve. More = broader context but potentially more noise.
                         st.success(f"✅ {file.name}")
                     except Exception as e:
                         st.error(f"❌ {file.name}: {e}")
-        
+
         # Stats
         st.divider()
         chunk_count = kb.count()
         st.metric("Chunks indexed", chunk_count)
-        
+
         # Reset button
-        if chunk_count > 0:
-            if st.button("🗑️ Reset Demo", type="secondary", use_container_width=True):
-                kb.clear()
-                # Clean up session temp files
-                shutil.rmtree(SESSION_DIR, ignore_errors=True)
-                SESSION_DIR.mkdir(parents=True, exist_ok=True)
-                # Reset state
-                st.session_state.messages = []
-                st.session_state.uploaded_files = []
-                st.session_state.pop("loaded_sample_docs", None)
-                st.session_state.demo_kb = None
-                st.rerun()
+        if chunk_count > 0 and st.button(
+            "🗑️ Reset Demo", type="secondary", use_container_width=True
+        ):
+            kb.clear()
+            # Clean up session temp files
+            shutil.rmtree(SESSION_DIR, ignore_errors=True)
+            SESSION_DIR.mkdir(parents=True, exist_ok=True)
+            # Reset state
+            st.session_state.messages = []
+            st.session_state.uploaded_files = []
+            st.session_state.pop("loaded_sample_docs", None)
+            st.session_state.demo_kb = None
+            st.rerun()
 
     # Main chat area
     if kb.count() == 0:
         st.info("👈 Load sample docs or upload your own to get started!")
-        
+
         # Show what piragi can do
         st.markdown("""
         ### What is Piragi?
-        
+
         Piragi is a zero-setup RAG (Retrieval-Augmented Generation) library that makes it easy to:
-        
+
         - 📄 **Load documents** - PDFs, Markdown, HTML, DOCX, URLs
         - 🔍 **Smart chunking** - Fixed, semantic, or hierarchical strategies
         - 🎯 **Accurate retrieval** - HyDE, hybrid search, reranking
         - 💬 **Grounded answers** - Every response cites its sources
-        
+
         Try loading the sample docs to see it in action!
         """)
         return
-    
+
     # Show example questions if sample docs loaded and no messages yet
-    if st.session_state.get("loaded_sample_docs") and len(st.session_state.messages) == 0 and "pending_question" not in st.session_state:
+    if (
+        st.session_state.get("loaded_sample_docs")
+        and len(st.session_state.messages) == 0
+        and "pending_question" not in st.session_state
+    ):
         st.markdown("### 💡 Try asking:")
         example_questions = [
             "How do I get started with piragi?",
@@ -320,62 +341,74 @@ How many chunks to retrieve. More = broader context but potentially more noise.
 
     # Chat input (always render this)
     chat_query = st.chat_input("Ask anything about the documents...")
-    
+
     # Handle pending question from example buttons
     query = st.session_state.pop("pending_question", None) or chat_query
-    
+
     if query:
         st.session_state.messages.append({"role": "user", "content": query})
         with st.chat_message("user"):
             st.markdown(query)
 
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                try:
-                    top_k = st.session_state.get("top_k", 5)
-                    
-                    start = time.time()
-                    answer = kb.ask(query, top_k=top_k)
-                    elapsed = time.time() - start
-                    
-                    st.markdown(answer.text)
-                    st.caption(f"⏱️ {elapsed:.2f}s")
-                    
-                    if answer.citations:
-                        citations_data = []
-                        # Sort by score - if negative (distance), sort ascending; if positive (similarity), sort descending
-                        is_distance = any(c.score < 0 for c in answer.citations)
-                        sorted_citations = sorted(answer.citations, key=lambda c: c.score, reverse=not is_distance)
-                        with st.expander("📎 Sources"):
-                            for cite in sorted_citations:
-                                # Display as positive percentage (relevance)
-                                score_pct = abs(int(cite.score * 100))
-                                st.markdown(f"**{cite.source}** ({score_pct}% match)")
-                                st.caption(cite.chunk[:200] + "..." if len(cite.chunk) > 200 else cite.chunk)
-                                citations_data.append({
+        with st.chat_message("assistant"), st.spinner("Thinking..."):
+            try:
+                top_k = st.session_state.get("top_k", 5)
+
+                start = time.time()
+                answer = kb.ask(query, top_k=top_k)
+                elapsed = time.time() - start
+
+                st.markdown(answer.text)
+                st.caption(f"⏱️ {elapsed:.2f}s")
+
+                if answer.citations:
+                    citations_data = []
+                    # Sort by score - if negative (distance), sort ascending;
+                    # if positive (similarity), sort descending
+                    is_distance = any(c.score < 0 for c in answer.citations)
+                    sorted_citations = sorted(
+                        answer.citations, key=lambda c: c.score, reverse=not is_distance
+                    )
+                    with st.expander("📎 Sources"):
+                        for cite in sorted_citations:
+                            # Display as positive percentage (relevance)
+                            score_pct = abs(int(cite.score * 100))
+                            st.markdown(f"**{cite.source}** ({score_pct}% match)")
+                            st.caption(
+                                cite.chunk[:200] + "..." if len(cite.chunk) > 200 else cite.chunk
+                            )
+                            citations_data.append(
+                                {
                                     "source": cite.source,
                                     "score": score_pct,
                                     "preview": cite.chunk[:200],
-                                })
-                        
-                        st.session_state.messages.append({
+                                }
+                            )
+
+                    st.session_state.messages.append(
+                        {
                             "role": "assistant",
                             "content": answer.text,
                             "citations": citations_data,
-                        })
-                    else:
-                        st.session_state.messages.append({
+                        }
+                    )
+                else:
+                    st.session_state.messages.append(
+                        {
                             "role": "assistant",
                             "content": answer.text,
-                        })
+                        }
+                    )
 
-                except Exception as e:
-                    error_msg = f"Error: {e}"
-                    st.error(error_msg)
-                    st.session_state.messages.append({
+            except Exception as e:
+                error_msg = f"Error: {e}"
+                st.error(error_msg)
+                st.session_state.messages.append(
+                    {
                         "role": "assistant",
                         "content": error_msg,
-                    })
+                    }
+                )
 
 
 if __name__ == "__main__":

@@ -1,9 +1,11 @@
 """PostgreSQL vector store using pgvector."""
 
+import contextlib
+import json
 import logging
 import time
-from typing import Any, Callable, Dict, List, Optional, TypeVar, TYPE_CHECKING
-import json
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Optional, TypeVar
 
 from ..types import Chunk, Citation
 
@@ -69,14 +71,14 @@ class PostgresStore:
 
     def __init__(
         self,
-        connection_string: Optional[str] = None,
+        connection_string: str | None = None,
         host: str = "localhost",
         port: int = 5432,
         database: str = "piragi",
         user: str = "postgres",
         password: str = "",
         table_name: str = "chunks",
-        vector_dimension: Optional[int] = None,
+        vector_dimension: int | None = None,
         max_retries: int = 3,
         retry_delay: float = 0.5,
         embedder: Optional["EmbeddingGenerator"] = None,
@@ -100,20 +102,21 @@ class PostgresStore:
             embedder: Optional EmbeddingGenerator instance for auto-inferring vector dimensions.
                 If provided and vector_dimension is not set, the embedder will be used to
                 determine the correct dimension automatically.
-        """
+        """  # noqa: E501
         try:
             import psycopg2
             from pgvector.psycopg2 import register_vector
+
             self._psycopg2 = psycopg2
             self._register_vector = register_vector
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "PostgresStore requires psycopg2 and pgvector. "
                 "Install with: pip install piragi[postgres]"
-            )
+            ) from e
 
         self.table_name = table_name
-        self._chunk_texts: List[str] = []
+        self._chunk_texts: list[str] = []
 
         # Determine vector dimension
         if vector_dimension is not None:
@@ -200,9 +203,9 @@ class PostgresStore:
 
                 if attempt < self.max_retries:
                     # Calculate delay with exponential backoff
-                    delay = self.retry_delay * (2 ** attempt)
+                    delay = self.retry_delay * (2**attempt)
                     logger.warning(
-                        f"Database operation failed (attempt {attempt + 1}/{self.max_retries + 1}): {e}. "
+                        f"Database operation failed (attempt {attempt + 1}/{self.max_retries + 1}): {e}. "  # noqa: E501
                         f"Retrying in {delay:.1f}s..."
                     )
                     time.sleep(delay)
@@ -213,7 +216,8 @@ class PostgresStore:
                     except Exception as reconnect_error:
                         logger.warning(f"Reconnection failed: {reconnect_error}")
 
-        # All retries exhausted
+        # All retries exhausted - last_exception is always set here since we're past the loop
+        assert last_exception is not None
         raise last_exception
 
     def _init_schema(self) -> None:
@@ -259,7 +263,7 @@ class PostgresStore:
             cur.execute(f"SELECT text FROM {self.table_name}")
             self._chunk_texts = [row[0] for row in cur.fetchall()]
 
-    def add_chunks(self, chunks: List[Chunk]) -> None:
+    def add_chunks(self, chunks: list[Chunk]) -> None:
         """Add chunks with embeddings to the store."""
         if not chunks:
             return
@@ -268,14 +272,14 @@ class PostgresStore:
             if chunk.embedding is None:
                 raise ValueError("All chunks must have embeddings")
 
-        def _do_add():
+        def _do_add() -> None:
             with self.conn.cursor() as cur:
                 for chunk in chunks:
                     cur.execute(
                         f"""
                         INSERT INTO {self.table_name} (text, source, chunk_index, metadata, embedding)
                         VALUES (%s, %s, %s, %s, %s)
-                        """,
+                        """,  # noqa: E501
                         (
                             chunk.text,
                             chunk.source,
@@ -292,13 +296,14 @@ class PostgresStore:
 
     def search(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int = 5,
-        filters: Optional[Dict[str, Any]] = None,
+        filters: dict[str, Any] | None = None,
         min_chunk_length: int = 100,
-    ) -> List[Citation]:
+    ) -> list[Citation]:
         """Search for similar chunks using cosine similarity."""
-        def _do_search() -> List[Citation]:
+
+        def _do_search() -> list[Citation]:
             with self.conn.cursor() as cur:
                 # Build query
                 where_clauses = [f"LENGTH(text) >= {min_chunk_length}"]
@@ -337,6 +342,7 @@ class PostgresStore:
 
     def delete_by_source(self, source: str) -> int:
         """Delete all chunks from a specific source."""
+
         def _do_delete() -> int:
             with self.conn.cursor() as cur:
                 cur.execute(
@@ -349,22 +355,24 @@ class PostgresStore:
             # Reload chunk texts
             self._load_chunk_texts()
 
-            return deleted
+            return int(deleted)
 
-        return self._execute_with_retry(_do_delete)
+        return int(self._execute_with_retry(_do_delete))
 
     def count(self) -> int:
         """Return the number of chunks in the store."""
+
         def _do_count() -> int:
             with self.conn.cursor() as cur:
                 cur.execute(f"SELECT COUNT(*) FROM {self.table_name}")
-                return cur.fetchone()[0]
+                return int(cur.fetchone()[0])
 
-        return self._execute_with_retry(_do_count)
+        return int(self._execute_with_retry(_do_count))
 
     def clear(self) -> None:
         """Clear all data from the store."""
-        def _do_clear():
+
+        def _do_clear() -> None:
             with self.conn.cursor() as cur:
                 cur.execute(f"TRUNCATE TABLE {self.table_name}")
                 self.conn.commit()
@@ -372,7 +380,7 @@ class PostgresStore:
 
         self._execute_with_retry(_do_clear)
 
-    def get_all_chunk_texts(self) -> List[str]:
+    def get_all_chunk_texts(self) -> list[str]:
         """Get all chunk texts for hybrid search."""
         return self._chunk_texts
 
@@ -380,10 +388,8 @@ class PostgresStore:
         """Close the database connection."""
         self.conn.close()
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Cleanup on deletion."""
         if hasattr(self, "conn") and self.conn:
-            try:
+            with contextlib.suppress(Exception):
                 self.conn.close()
-            except Exception:
-                pass

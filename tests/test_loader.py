@@ -1,14 +1,15 @@
 """Tests for document loader."""
 
 import os
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from piragi.loader import DocumentLoader, REMOTE_SCHEMES
+from piragi.loader import REMOTE_SCHEMES, DocumentLoader
 
 
-def test_load_single_file(sample_text_file):
+def test_load_single_file(sample_text_file: str) -> None:
     """Test loading a single file."""
     loader = DocumentLoader()
     documents = loader.load(sample_text_file)
@@ -19,7 +20,7 @@ def test_load_single_file(sample_text_file):
     assert documents[0].metadata["filename"] == "sample.txt"
 
 
-def test_load_multiple_files(sample_text_file, sample_markdown_file):
+def test_load_multiple_files(sample_text_file: str, sample_markdown_file: str) -> None:
     """Test loading multiple files."""
     loader = DocumentLoader()
     documents = loader.load([sample_text_file, sample_markdown_file])
@@ -30,7 +31,7 @@ def test_load_multiple_files(sample_text_file, sample_markdown_file):
     assert sample_markdown_file in sources
 
 
-def test_load_glob_pattern(temp_dir, sample_text_file, sample_markdown_file):
+def test_load_glob_pattern(temp_dir: str, sample_text_file: str, sample_markdown_file: str) -> None:
     """Test loading files with glob pattern."""
     loader = DocumentLoader()
     pattern = os.path.join(temp_dir, "*.md")
@@ -40,7 +41,9 @@ def test_load_glob_pattern(temp_dir, sample_text_file, sample_markdown_file):
     assert any("README" in doc.metadata.get("filename", "") for doc in documents)
 
 
-def test_load_directory(temp_dir, sample_text_file, sample_markdown_file, sample_code_file):
+def test_load_directory(
+    temp_dir: str, sample_text_file: str, sample_markdown_file: str, sample_code_file: str
+) -> None:
     """Test loading entire directory."""
     loader = DocumentLoader()
     documents = loader.load(temp_dir)
@@ -48,7 +51,7 @@ def test_load_directory(temp_dir, sample_text_file, sample_markdown_file, sample
     assert len(documents) >= 3
 
 
-def test_load_invalid_source():
+def test_load_invalid_source() -> None:
     """Test loading from invalid source."""
     loader = DocumentLoader()
 
@@ -56,7 +59,7 @@ def test_load_invalid_source():
         loader.load("/nonexistent/file.txt")
 
 
-def test_metadata_extraction(sample_text_file):
+def test_metadata_extraction(sample_text_file: str) -> None:
     """Test metadata extraction."""
     loader = DocumentLoader()
     documents = loader.load(sample_text_file)
@@ -71,7 +74,7 @@ def test_metadata_extraction(sample_text_file):
 # Remote filesystem tests
 
 
-def test_is_remote_uri():
+def test_is_remote_uri() -> None:
     """Test detection of remote filesystem URIs."""
     loader = DocumentLoader()
 
@@ -89,7 +92,7 @@ def test_is_remote_uri():
     assert not loader._is_remote_uri("http://example.com/doc.md")
 
 
-def test_is_url():
+def test_is_url() -> None:
     """Test detection of HTTP/HTTPS URLs."""
     loader = DocumentLoader()
 
@@ -103,7 +106,7 @@ def test_is_url():
     assert not loader._is_url("/absolute/path/file.md")
 
 
-def test_remote_schemes_defined():
+def test_remote_schemes_defined() -> None:
     """Test that expected remote schemes are defined."""
     assert "s3" in REMOTE_SCHEMES
     assert "gs" in REMOTE_SCHEMES
@@ -112,11 +115,13 @@ def test_remote_schemes_defined():
     assert "abfs" in REMOTE_SCHEMES
 
 
-@patch("piragi.loader.fsspec")
-def test_load_remote_single_file(mock_fsspec, tmp_path):
+@patch("piragi.loader._get_fsspec")
+def test_load_remote_single_file(mock_get_fsspec: MagicMock, tmp_path: Path) -> None:
     """Test loading a single file from remote filesystem."""
     # Create a mock filesystem
+    mock_fsspec = MagicMock()
     mock_fs = MagicMock()
+    mock_get_fsspec.return_value = mock_fsspec
     mock_fsspec.filesystem.return_value = mock_fs
 
     # Mock filesystem methods
@@ -127,7 +132,7 @@ def test_load_remote_single_file(mock_fsspec, tmp_path):
     test_file = tmp_path / "test.txt"
     test_file.write_text("Remote file content")
 
-    def mock_get(remote_path, local_path):
+    def mock_get(remote_path: str, local_path: str) -> None:
         # Copy test content to the temp file location
         with open(local_path, "w") as f:
             f.write("Remote file content")
@@ -144,17 +149,19 @@ def test_load_remote_single_file(mock_fsspec, tmp_path):
     mock_fsspec.filesystem.assert_called_with("s3")
 
 
-@patch("piragi.loader.fsspec")
-def test_load_remote_glob_pattern(mock_fsspec, tmp_path):
+@patch("piragi.loader._get_fsspec")
+def test_load_remote_glob_pattern(mock_get_fsspec: MagicMock, tmp_path: str) -> None:
     """Test loading files with glob pattern from remote filesystem."""
+    mock_fsspec = MagicMock()
     mock_fs = MagicMock()
+    mock_get_fsspec.return_value = mock_fsspec
     mock_fsspec.filesystem.return_value = mock_fs
 
     # Mock glob returning multiple files
     mock_fs.glob.return_value = ["bucket/docs/file1.txt", "bucket/docs/file2.txt"]
     mock_fs.isdir.return_value = False
 
-    def mock_get(remote_path, local_path):
+    def mock_get(remote_path: str, local_path: str) -> None:
         with open(local_path, "w") as f:
             f.write(f"Content of {remote_path}")
 
@@ -168,10 +175,13 @@ def test_load_remote_glob_pattern(mock_fsspec, tmp_path):
     mock_fs.glob.assert_called_with("bucket/docs/*.txt")
 
 
-@patch("piragi.loader.fsspec")
-def test_load_remote_missing_dependency(mock_fsspec):
+@patch("piragi.loader._get_fsspec")
+def test_load_remote_missing_dependency(mock_get_fsspec: MagicMock) -> None:
     """Test helpful error message when remote FS dependency is missing."""
-    mock_fsspec.filesystem.side_effect = ImportError("No module named 's3fs'")
+    mock_get_fsspec.side_effect = ImportError(
+        "fsspec is required for remote filesystem support. "
+        "Install it with: pip install piragi[remote] or pip install fsspec"
+    )
 
     loader = DocumentLoader()
 
@@ -179,10 +189,12 @@ def test_load_remote_missing_dependency(mock_fsspec):
         loader._load_remote("s3://bucket/file.txt")
 
 
-@patch("piragi.loader.fsspec")
-def test_load_remote_no_files_found(mock_fsspec):
+@patch("piragi.loader._get_fsspec")
+def test_load_remote_no_files_found(mock_get_fsspec: MagicMock) -> None:
     """Test error when no files match remote glob pattern."""
+    mock_fsspec = MagicMock()
     mock_fs = MagicMock()
+    mock_get_fsspec.return_value = mock_fsspec
     mock_fsspec.filesystem.return_value = mock_fs
     mock_fs.glob.return_value = []
 
@@ -195,7 +207,7 @@ def test_load_remote_no_files_found(mock_fsspec):
 # Crawl URL tests
 
 
-def test_is_crawl_url():
+def test_is_crawl_url() -> None:
     """Test detection of crawl URLs."""
     loader = DocumentLoader()
 
@@ -213,7 +225,7 @@ def test_is_crawl_url():
 
 
 @patch("piragi.loader._get_crawl4ai")
-def test_crawl_url_missing_dependency(mock_get_crawl4ai):
+def test_crawl_url_missing_dependency(mock_get_crawl4ai: MagicMock) -> None:
     """Test helpful error message when crawl4ai is not installed."""
     mock_get_crawl4ai.side_effect = ImportError(
         "crawl4ai is required for recursive URL crawling. "

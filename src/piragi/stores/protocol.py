@@ -1,6 +1,6 @@
 """Vector store protocol definition."""
 
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from ..types import Chunk, Citation
 
@@ -42,7 +42,7 @@ class VectorStoreProtocol(Protocol):
         >>> kb = Ragi("./docs", store=MyCustomStore())
     """
 
-    def add_chunks(self, chunks: List[Chunk]) -> None:
+    def add_chunks(self, chunks: list[Chunk]) -> None:
         """
         Add chunks with embeddings to the store.
 
@@ -53,10 +53,10 @@ class VectorStoreProtocol(Protocol):
 
     def search(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int = 5,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[Citation]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[Citation]:
         """
         Search for similar chunks.
 
@@ -95,11 +95,21 @@ class VectorStoreProtocol(Protocol):
         """Clear all data from the store."""
         ...
 
-    def get_all_chunk_texts(self) -> List[str]:
+    def get_all_chunk_texts(self) -> list[str]:
         """
         Get all chunk texts for hybrid search indexing.
 
         Returns:
             List of all chunk texts
+        """
+        ...
+
+    @property
+    def vector_dimension(self) -> int:
+        """
+        Return the vector dimension for this store.
+
+        Returns:
+            Vector dimension (e.g., 768 for all-mpnet-base-v2)
         """
         ...

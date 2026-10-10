@@ -1,12 +1,10 @@
 """Tests for document chunking."""
 
-import pytest
-
 from piragi.chunking import Chunker
 from piragi.types import Document
 
 
-def test_chunk_small_document():
+def test_chunk_small_document() -> None:
     """Test chunking a small document that fits in one chunk."""
     chunker = Chunker(chunk_size=512)
     doc = Document(
@@ -24,7 +22,7 @@ def test_chunk_small_document():
     assert chunks[0].metadata["type"] == "test"
 
 
-def test_chunk_document_with_headers():
+def test_chunk_document_with_headers() -> None:
     """Test chunking respects markdown headers."""
     chunker = Chunker(chunk_size=100)
     doc = Document(
@@ -48,7 +46,7 @@ Even more content.""",
     assert any("Header 2" in chunk.text for chunk in chunks)
 
 
-def test_chunk_with_overlap():
+def test_chunk_with_overlap() -> None:
     """Test that chunks have proper overlap."""
     chunker = Chunker(chunk_size=50, chunk_overlap=10)
 
@@ -70,7 +68,7 @@ def test_chunk_with_overlap():
         assert chunk.source == "long.txt"
 
 
-def test_metadata_propagation():
+def test_metadata_propagation() -> None:
     """Test that document metadata is propagated to chunks."""
     chunker = Chunker(chunk_size=512)
     doc = Document(
@@ -86,7 +84,7 @@ def test_metadata_propagation():
     assert chunks[0].metadata["category"] == "test"
 
 
-def test_sentence_break_with_numbered_list():
+def test_sentence_break_with_numbered_list() -> None:
     """Test that numbered lists don't cause incorrect sentence breaks."""
     chunker = Chunker(chunk_size=50, chunk_overlap=10)
 
@@ -105,12 +103,12 @@ def test_sentence_break_with_numbered_list():
     assert "1." in result or "Mash" in result
 
 
-def test_sentence_break_with_acronyms():
+def test_sentence_break_with_acronyms() -> None:
     """Test that acronyms don't cause incorrect sentence breaks."""
     chunker = Chunker(chunk_size=100, chunk_overlap=10)
 
     # Text with acronyms - periods in acronyms should not be sentence endings
-    text = """Geoffrey Hinton received his B.A. in Experimental Psychology from Cambridge in 1970 and his Ph.D. in Artificial Intelligence from Edinburgh in 1978. He is a pioneer in deep learning."""
+    text = """Geoffrey Hinton received his B.A. in Experimental Psychology from Cambridge in 1970 and his Ph.D. in Artificial Intelligence from Edinburgh in 1978. He is a pioneer in deep learning."""  # noqa: E501
 
     result = chunker._break_at_sentence(text)
 
@@ -119,12 +117,12 @@ def test_sentence_break_with_acronyms():
     assert "B.A." in result or "Ph.D." in result
 
 
-def test_sentence_break_with_abbreviations():
+def test_sentence_break_with_abbreviations() -> None:
     """Test that common abbreviations don't cause incorrect sentence breaks."""
     chunker = Chunker(chunk_size=100, chunk_overlap=10)
 
     # Text with abbreviations
-    text = """Dr. Smith and Mr. Jones met with Prof. Williams at the U.S. embassy. They discussed important matters regarding the U.K. delegation."""
+    text = """Dr. Smith and Mr. Jones met with Prof. Williams at the U.S. embassy. They discussed important matters regarding the U.K. delegation."""  # noqa: E501
 
     result = chunker._break_at_sentence(text)
 
@@ -133,12 +131,12 @@ def test_sentence_break_with_abbreviations():
     assert "Mr." in result or "Prof." in result
 
 
-def test_sentence_break_with_initials():
+def test_sentence_break_with_initials() -> None:
     """Test that initials don't cause incorrect sentence breaks."""
     chunker = Chunker(chunk_size=100, chunk_overlap=10)
 
     # Text with initials in names
-    text = """J.K. Rowling wrote the Harry Potter series. C.S. Lewis wrote the Chronicles of Narnia. Both are beloved authors."""
+    text = """J.K. Rowling wrote the Harry Potter series. C.S. Lewis wrote the Chronicles of Narnia. Both are beloved authors."""  # noqa: E501
 
     result = chunker._break_at_sentence(text)
 
@@ -149,17 +147,17 @@ def test_sentence_break_with_initials():
 class TestMinChunkLength:
     """Tests for min_chunk_length filtering."""
 
-    def test_min_chunk_length_default_zero(self):
+    def test_min_chunk_length_default_zero(self) -> None:
         """Test that default min_chunk_length is 0 (no filtering)."""
         chunker = Chunker(chunk_size=512)
         assert chunker.min_chunk_length == 0
 
-    def test_min_chunk_length_set(self):
+    def test_min_chunk_length_set(self) -> None:
         """Test that min_chunk_length can be set."""
         chunker = Chunker(chunk_size=512, min_chunk_length=200)
         assert chunker.min_chunk_length == 200
 
-    def test_min_chunk_length_filters_short_chunks(self):
+    def test_min_chunk_length_filters_short_chunks(self) -> None:
         """Test that chunks shorter than min_chunk_length are filtered out."""
         chunker = Chunker(chunk_size=100, min_chunk_length=50)
 
@@ -178,7 +176,7 @@ Tiny.
 
 ## Section 3
 
-Another section with sufficient content that should definitely pass the minimum length requirement we configured.""",
+Another section with sufficient content that should definitely pass the minimum length requirement we configured.""",  # noqa: E501
             source="test.md",
             metadata={},
         )
@@ -189,7 +187,7 @@ Another section with sufficient content that should definitely pass the minimum 
         for chunk in chunks:
             assert len(chunk.text.strip()) >= 50, f"Chunk too short: {repr(chunk.text)}"
 
-    def test_min_chunk_length_reindexes_chunks(self):
+    def test_min_chunk_length_reindexes_chunks(self) -> None:
         """Test that chunk indices are re-indexed after filtering."""
         chunker = Chunker(chunk_size=100, min_chunk_length=30)
 
@@ -219,7 +217,7 @@ Another section with plenty of content to satisfy the minimum.""",
         for i, chunk in enumerate(chunks):
             assert chunk.chunk_index == i, f"Expected index {i}, got {chunk.chunk_index}"
 
-    def test_min_chunk_length_zero_no_filtering(self):
+    def test_min_chunk_length_zero_no_filtering(self) -> None:
         """Test that min_chunk_length=0 doesn't filter anything."""
         chunker = Chunker(chunk_size=512, min_chunk_length=0)
 
@@ -240,7 +238,7 @@ Y""",
         # Should have chunks for the short sections too
         assert len(chunks) >= 2
 
-    def test_min_chunk_length_with_whitespace(self):
+    def test_min_chunk_length_with_whitespace(self) -> None:
         """Test that whitespace is stripped when checking length."""
         chunker = Chunker(chunk_size=100, min_chunk_length=20)
 

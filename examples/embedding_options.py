@@ -2,6 +2,7 @@
 
 import os
 import tempfile
+
 from piragi import Ragi
 
 
@@ -55,7 +56,7 @@ def main():
         print(f"  Remote API: {kb1.embedder.use_remote}")
 
         answer = kb1.ask("What are the two types of embedding models?")
-        print(f"\nQ: What are the two types of embedding models?")
+        print("\nQ: What are the two types of embedding models?")
         print(f"A: {answer.text}\n")
 
         print("=" * 60)
@@ -75,7 +76,7 @@ def main():
 
         print(f"✓ Loaded {kb2.count()} chunks")
         print(f"  Model: {kb2.embedder.model_name}")
-        print(f"  Device: cpu")
+        print("  Device: cpu")
         print()
 
         print("=" * 60)
@@ -101,7 +102,7 @@ def main():
             print(f"  Base URL: {kb3.embedder.base_url}")
 
             answer = kb3.ask("What is an example of a local model?")
-            print(f"\nQ: What is an example of a local model?")
+            print("\nQ: What is an example of a local model?")
             print(f"A: {answer.text}\n")
         else:
             print("⚠️  Skipped: OPENAI_API_KEY not set")

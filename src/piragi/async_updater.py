@@ -1,11 +1,11 @@
 """Async background updater for automatic document refresh."""
 
-import asyncio
+import logging
 import threading
 import time
-from typing import Any, Callable, Dict, List, Optional, Union
-from queue import Queue, Empty
-import logging
+from collections.abc import Callable
+from queue import Empty, Queue
+from typing import Any
 
 from .change_detection import ChangeDetector
 
@@ -31,7 +31,7 @@ class AsyncUpdater:
 
     def __init__(
         self,
-        refresh_callback: Callable[[Union[str, List[str]]], None],
+        refresh_callback: Callable[[str | list[str]], Any],
         check_interval: float = 300.0,
         max_workers: int = 2,
     ):
@@ -39,7 +39,8 @@ class AsyncUpdater:
         Initialize the async updater.
 
         Args:
-            refresh_callback: Function to call when refresh is needed (e.g., kb.refresh)
+            refresh_callback: Function to call when refresh is needed (e.g., kb.refresh).
+                The return value is ignored.
             check_interval: Default interval between checks in seconds
             max_workers: Number of background workers
         """
@@ -48,16 +49,16 @@ class AsyncUpdater:
         self.max_workers = max_workers
 
         # Source metadata tracking
-        self.sources_metadata: Dict[str, Dict[str, Any]] = {}
+        self.sources_metadata: dict[str, dict[str, Any]] = {}
 
         # Update queue and control
         self.update_queue: Queue = Queue()
         self.running = False
-        self.workers: List[threading.Thread] = []
+        self.workers: list[threading.Thread] = []
         self._lock = threading.RLock()
 
         # Statistics
-        self.stats = {
+        self.stats: dict[str, int | float | None] = {
             "checks_performed": 0,
             "updates_performed": 0,
             "last_check_time": None,
@@ -67,7 +68,7 @@ class AsyncUpdater:
         self,
         source: str,
         content: str,
-        check_interval: Optional[float] = None,
+        check_interval: float | None = None,
     ) -> None:
         """
         Register a source for automatic update checking.
@@ -205,7 +206,8 @@ class AsyncUpdater:
 
                 metadata = self.sources_metadata[source]
 
-            self.stats["checks_performed"] += 1
+            checks = self.stats.get("checks_performed", 0)
+            self.stats["checks_performed"] = (checks if isinstance(checks, int) else 0) + 1
 
             # Check for changes
             changed = False
@@ -237,7 +239,8 @@ class AsyncUpdater:
             if changed:
                 logger.info(f"Change detected in {source}, refreshing...")
                 self.refresh_callback(source)
-                self.stats["updates_performed"] += 1
+                updates = self.stats.get("updates_performed", 0)
+                self.stats["updates_performed"] = (updates if isinstance(updates, int) else 0) + 1
 
                 # Update metadata after refresh
                 # Note: In production, you'd want to read the new content and hash
@@ -257,7 +260,7 @@ class AsyncUpdater:
         self.update_queue.put(UpdateTask(source, priority))
         logger.debug(f"Queued update check for {source}")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get updater statistics."""
         with self._lock:
             return {
@@ -279,7 +282,7 @@ class AsyncUpdaterMixin:
         kb = AutoUpdateRagi("./docs", auto_update=True)
     """
 
-    def __init__(self, *args, auto_update: bool = False, **kwargs):
+    def __init__(self, *args: Any, auto_update: bool = False, **kwargs: Any) -> None:
         """
         Initialize with optional auto-update.
 
@@ -292,7 +295,7 @@ class AsyncUpdaterMixin:
         super().__init__(*args, **kwargs)
 
         self.auto_update_enabled = auto_update
-        self.updater: Optional[AsyncUpdater] = None
+        self.updater: AsyncUpdater | None = None
 
         if auto_update:
             # Extract auto-update config
@@ -304,7 +307,7 @@ class AsyncUpdaterMixin:
 
             # Initialize updater
             self.updater = AsyncUpdater(
-                refresh_callback=self.refresh,
+                refresh_callback=self.refresh,  # type: ignore[attr-defined]
                 check_interval=interval,
                 max_workers=workers,
             )
@@ -312,9 +315,9 @@ class AsyncUpdaterMixin:
             # Start background workers
             self.updater.start()
 
-    def add(self, sources, **kwargs):
+    def add(self, sources: str | list[str], **kwargs: Any) -> Any:
         """Override add to register sources with auto-updater."""
-        result = super().add(sources, **kwargs)
+        result = super().add(sources, **kwargs)  # type: ignore[misc]
 
         # Register sources with updater if auto-update enabled
         if self.auto_update_enabled and self.updater:
@@ -328,7 +331,7 @@ class AsyncUpdaterMixin:
 
         return result
 
-    def get_update_stats(self) -> Dict[str, Any]:
+    def get_update_stats(self) -> dict[str, Any]:
         """Get auto-update statistics."""
         if self.updater:
             return self.updater.get_stats()
@@ -339,7 +342,7 @@ class AsyncUpdaterMixin:
         if self.updater:
             self.updater.stop()
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Cleanup on deletion."""
         if hasattr(self, "updater") and self.updater:
             self.updater.stop()

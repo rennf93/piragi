@@ -1,7 +1,7 @@
 """Cross-encoder reranking for improved retrieval accuracy."""
 
 import logging
-from typing import List, Optional, Tuple
+from typing import Any
 
 from .types import Citation
 
@@ -23,7 +23,7 @@ class CrossEncoderReranker:
     def __init__(
         self,
         model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2",
-        device: Optional[str] = None,
+        device: str | None = None,
         batch_size: int = 32,
         trust_remote_code: bool = False,
     ) -> None:
@@ -44,11 +44,11 @@ class CrossEncoderReranker:
         """
         self.model_name = model_name
         self.batch_size = batch_size
-        self._model = None
+        self._model: Any = None
         self._device = device
         self._trust_remote_code = trust_remote_code
 
-    def _load_model(self):
+    def _load_model(self) -> Any:
         """Lazy load the cross-encoder model."""
         if self._model is None:
             try:
@@ -59,7 +59,7 @@ class CrossEncoderReranker:
                     device=self._device,
                     trust_remote_code=self._trust_remote_code,
                 )
-                
+
                 # Fix for models without pad_token_id (e.g., Qwen3 rerankers)
                 # Batch inference fails if pad_token_id is not defined
                 # Fallback to eos_token_id when available (fixes #14)
@@ -71,26 +71,30 @@ class CrossEncoderReranker:
                             eos = getattr(cfg, "eos_token_id", None)
                             if eos is not None:
                                 cfg.pad_token_id = eos
-                                logger.debug(f"Missing pad_token_id detected; set to eos_token_id={eos}")
+                                logger.debug(
+                                    f"Missing pad_token_id detected; set to eos_token_id={eos}"
+                                )
                             else:
-                                logger.warning("Neither pad_token_id nor eos_token_id present in model config")
+                                logger.warning(
+                                    "Neither pad_token_id nor eos_token_id present in model config"
+                                )
                 except Exception as e:
                     logger.warning(f"Failed to adjust pad_token_id on CrossEncoder: {e}")
-                
+
                 logger.info(f"Loaded cross-encoder model: {self.model_name}")
-            except ImportError:
+            except ImportError as e:
                 raise ImportError(
                     "sentence-transformers is required for cross-encoder reranking. "
                     "Install it with: pip install sentence-transformers"
-                )
+                ) from e
         return self._model
 
     def rerank(
         self,
         query: str,
-        citations: List[Citation],
-        top_k: Optional[int] = None,
-    ) -> List[Citation]:
+        citations: list[Citation],
+        top_k: int | None = None,
+    ) -> list[Citation]:
         """
         Rerank citations using cross-encoder scoring.
 
@@ -118,11 +122,12 @@ class CrossEncoderReranker:
 
         # Normalize scores to 0-1 range using sigmoid
         import numpy as np
+
         normalized_scores = 1 / (1 + np.exp(-scores))
 
         # Create new citations with updated scores
         scored_citations = []
-        for citation, score in zip(citations, normalized_scores):
+        for citation, score in zip(citations, normalized_scores, strict=False):
             new_citation = Citation(
                 source=citation.source,
                 chunk=citation.chunk,
@@ -156,6 +161,7 @@ class CrossEncoderReranker:
 
         # Normalize to 0-1
         import numpy as np
+
         return float(1 / (1 + np.exp(-score)))
 
 
@@ -180,10 +186,10 @@ class TFIDFReranker:
 
         self.vector_weight = vector_weight
         self.tfidf_weight = tfidf_weight
-        self._vectorizer = None
+        self._vectorizer: Any = None
         self._fitted = False
 
-    def _get_vectorizer(self):
+    def _get_vectorizer(self) -> Any:
         """Get or create TF-IDF vectorizer."""
         if self._vectorizer is None:
             from sklearn.feature_extraction.text import TfidfVectorizer
@@ -199,9 +205,9 @@ class TFIDFReranker:
     def rerank(
         self,
         query: str,
-        citations: List[Citation],
-        top_k: Optional[int] = None,
-    ) -> List[Citation]:
+        citations: list[Citation],
+        top_k: int | None = None,
+    ) -> list[Citation]:
         """
         Rerank citations using TF-IDF scoring combined with vector scores.
 
@@ -229,6 +235,7 @@ class TFIDFReranker:
 
             # Compute cosine similarity between query and each chunk
             from sklearn.metrics.pairwise import cosine_similarity
+
             tfidf_scores = cosine_similarity(query_vector, tfidf_matrix)[0]
 
         except Exception as e:
@@ -237,10 +244,9 @@ class TFIDFReranker:
 
         # Combine scores
         scored_citations = []
-        for citation, tfidf_score in zip(citations, tfidf_scores):
-            combined_score = (
-                self.vector_weight * citation.score +
-                self.tfidf_weight * float(tfidf_score)
+        for citation, tfidf_score in zip(citations, tfidf_scores, strict=False):
+            combined_score = self.vector_weight * citation.score + self.tfidf_weight * float(
+                tfidf_score
             )
             new_citation = Citation(
                 source=citation.source,
@@ -273,7 +279,7 @@ class HybridReranker:
         cross_encoder_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2",
         cross_encoder_top_n: int = 20,
         tfidf_vector_weight: float = 0.6,
-        device: Optional[str] = None,
+        device: str | None = None,
         trust_remote_code: bool = False,
     ):
         """
@@ -308,9 +314,9 @@ class HybridReranker:
     def rerank(
         self,
         query: str,
-        citations: List[Citation],
-        top_k: Optional[int] = None,
-    ) -> List[Citation]:
+        citations: list[Citation],
+        top_k: int | None = None,
+    ) -> list[Citation]:
         """
         Rerank using hybrid approach.
 
